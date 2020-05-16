@@ -1,4 +1,5 @@
 # This is a script I use to test the performance of AIs
+import json
 import pickle
 import sys
 import threading
@@ -7,22 +8,33 @@ import traceback
 from collections import defaultdict
 from concurrent.futures.thread import ThreadPoolExecutor
 
-from katrain.core.ai import ai_move
-from katrain.core.common import OUTPUT_ERROR, OUTPUT_INFO
 from elote import EloCompetitor
+from katrain.core.ai import generate_ai_move
+from katrain.core.base_katrain import Player
+from katrain.core.constants import (
+    AI_LOCAL,
+    AI_RANK,
+    AI_TENUKI,
+    AI_WEIGHTED,
+    OUTPUT_ERROR,
+    OUTPUT_INFO,
+    AI_PICK,
+    AI_TERRITORY,
+    PLAYER_AI,
+    AI_POLICY,
+)
 from katrain.core.engine import KataGoEngine
 from katrain.core.game import Game
-import json
 
-DB_FILENAME = "bots/ai_performance.pickle"
+from settings import Logger
 
 
-class Logger:
-    def log(self, msg, level):
-        if level <= OUTPUT_INFO:
-            print(msg)
-        if level <= OUTPUT_ERROR:
-            print(msg, file=sys.stderr)
+class SPLogger(Logger):
+    def players_info(self):
+        return {bw: Player(player=bw, player_type=PLAYER_AI) for bw in "BW"}
+
+
+DB_FILENAME = "ai_performance.pickle"
 
 
 logger = Logger()
@@ -34,14 +46,15 @@ with open("config.json") as f:
 
 class AI:
     DEFAULT_ENGINE_SETTINGS = {
-        "katago": "KataGo/katago",
-        "model": "KataGo/models/b15-1.3.2.txt.gz",
-        "config": "bots/lowmem.cfg",
+        "katago": "katrain/KataGo/katago",
+        "model": "katrain/models/g170e-b15c192-s1672170752-d466197061.bin.gz",
+        #        "config": "lowmem.cfg",
+        "config": "kata_config.cfg",
         "max_visits": 1,
         "max_time": 300.0,
         "_enable_ownership": False,
     }
-    NUM_THREADS = 32
+    NUM_THREADS = 128
     IGNORE_SETTINGS_IN_TAG = {"threads", "_enable_ownership", "katago"}  # katago for switching from/to bs version
     ENGINES = []
     LOCK = threading.Lock()
@@ -51,7 +64,11 @@ class AI:
         self.strategy = strategy
         self.ai_settings = ai_settings
         self.engine_settings = engine_settings or {}
-        fmt_settings = [f"{k}={v}" for k, v in {**self.ai_settings, **self.engine_settings}.items() if k not in AI.IGNORE_SETTINGS_IN_TAG]
+        fmt_settings = [
+            f"{k}={v}"
+            for k, v in {**self.ai_settings, **self.engine_settings}.items()
+            if k not in AI.IGNORE_SETTINGS_IN_TAG
+        ]
         self.name = f"{strategy}({ ','.join(fmt_settings) })"
         self.fix_settings()
 
@@ -100,57 +117,74 @@ def retrieve_ais(selected_ais):
     return [ai for ai in ai_database if ai in selected_ais]
 
 
-test_ais = [
-    AI("Default", {}, {"model": "katago/6b.bin.gz", "max_visits": 500}),
-    AI("Default", {}, {"model": "katago/6b104-s22347264.txt.gz", "max_visits": 500}),
-    AI("Default", {}, {"model": "katago/6b104-s42364928.txt.gz", "max_visits": 500}),
-    #    AI("Default", {}, {"model": "KataGo/models/b10-1.3.txt.gz", "max_visits": 500}),
-    AI("Policy", {}),
-    AI("P:Local", {}),
-    AI("P:Weighted", {}),
-    AI("P:Pick", {}),
-    AI("ScoreLoss", {"max_visits": 500}),
-    #    AI("P:Tenuki", {}),
-    #    AI("P:Local", {}),
-    AI("P:Influence", {}),
-    #    AI("P:Territory", {}),
+reference_ais = [
+    AI(AI_RANK, {"kyu_rank": 18}, {}),
+    AI(AI_RANK, {"kyu_rank": 14}, {}),
+    AI(AI_RANK, {"kyu_rank": 10}, {}),
+    AI(AI_RANK, {"kyu_rank": 8}, {}),
+    AI(AI_RANK, {"kyu_rank": 6}, {}),
+    AI(AI_RANK, {"kyu_rank": 4}, {}),
+    AI(AI_RANK, {"kyu_rank": 2}, {}),
+    AI(AI_RANK, {"kyu_rank": -1}, {}),
+    AI(AI_RANK, {"kyu_rank": -3}, {}),
+    AI(AI_POLICY, {}, {}),
 ]
 
+test_ais = []
+test_type = AI_LOCAL
 
-for ai in test_ais:
+if test_type == AI_WEIGHTED:
+    for wf in [0.5, 1.0, 1.25, 1.5, 1.75, 2, 2.25]:
+        test_ais.append(AI(AI_WEIGHTED, {"weaken_fac": wf}, {}))
+elif test_type == AI_LOCAL:
+    for pf in [0.0, 0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 1.0]:
+        for pn in [0, 5, 10, 15, 25, 50]:
+            test_ais.append(AI(AI_LOCAL, {"pick_frac": pf, "pick_n": pn}, {}))
+elif test_type == AI_TENUKI:
+    for pf in [0.0, 0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 1.0]:
+        for pn in [0, 5, 10, 15, 25, 50]:
+            test_ais.append(AI(AI_TENUKI, {"pick_frac": pf, "pick_n": pn}, {}))
+
+for ai in reference_ais + test_ais:
     add_ai(ai)
+
 
 N_GAMES = 1
 BOARDSIZE = 19
 
-ais_to_test = retrieve_ais(test_ais)
+ais_to_test = retrieve_ais(test_ais + reference_ais)
 
 results = defaultdict(list)
 
 
-def play_games(black: AI, white: AI):
+def play_game(black: AI, white: AI):
     players = {"B": black, "W": white}
     engines = {"B": black.get_engine(), "W": white.get_engine()}
     tag = f"{black.name} vs {white.name}"
     try:
-        game = Game(Logger(), engines, {"init_size": BOARDSIZE})
+        game = Game(Logger(), engines, game_properties={"SZ": BOARDSIZE, "PW": white.strategy, "PB": black.strategy})
         game.root.add_list_property("PW", [white.name])
         game.root.add_list_property("PB", [black.name])
         start_time = time.time()
-        while not game.ended and game.current_node.depth < 300:
+        while not game.end_result and game.current_node.depth < 300:
             p = game.current_node.next_player
-            move, node = ai_move(game, players[p].strategy, players[p].ai_settings)
-        while not game.current_node.analysis_ready:
+            move, node = generate_ai_move(game, players[p].strategy, players[p].ai_settings)
+        while not game.current_node.analysis_complete:
             time.sleep(0.001)
         game.game_id += f"_{game.current_node.format_score()}"
+        sgf_out_msg = game.write_sgf(
+            "sgf_selfplay/", trainer_config={"eval_show_ai": True, "save_feedback": [True], "eval_thresholds": [0]}
+        )
         print(
-            f"{tag}\tGame finished in {time.time()-start_time:.1f}s @ move {game.current_node.depth} {game.current_node.format_score()} -> {game.write_sgf('sgf_selfplay/')}",
+            f"{tag}\tGame finished in {time.time()-start_time:.1f}s @ move {game.current_node.depth} {game.current_node.format_score()} -> {sgf_out_msg}",
             file=sys.stderr,
         )
         score = game.current_node.score
         if score > 0.3:
             black.elo_comp.beat(white.elo_comp)
-        elif score > -0.3:
+        elif score < -0.3:
+            white.elo_comp.beat(black.elo_comp)
+        else:
             black.elo_comp.tied(white.elo_comp)
 
         results[tag].append(score)
@@ -175,11 +209,11 @@ for n in range(N_GAMES):
         e.shutdown()
     AI.ENGINES = []
 
-    with ThreadPoolExecutor(max_workers=16) as threadpool:
+    with ThreadPoolExecutor(max_workers=4 * AI.NUM_THREADS) as threadpool:
         for b in ais_to_test:
             for w in ais_to_test:
                 if b is not w:
-                    threadpool.submit(play_games, b, w)
+                    threadpool.submit(play_game, b, w)
     print("POOL EXIT")
 
     print(f"---- RESULTS ({n}) ----")
