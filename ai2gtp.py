@@ -11,7 +11,7 @@ from katrain.core.ai import generate_ai_move
 from katrain.core.base_katrain import KaTrainBase
 from katrain.core.constants import *
 from katrain.core.constants import OUTPUT_ERROR, OUTPUT_INFO
-from katrain.core.engine import EngineDiedException, KataGoEngine
+from katrain.core.engine import KataGoEngine
 from katrain.core.game import Game
 from katrain.core.sgf_parser import Move
 
@@ -83,8 +83,8 @@ def malkovich_analysis(cn):
     start = time.time()
     while not cn.analysis_complete:
         time.sleep(0.001)
-        if engine.katago_process.poll() is not None:  # TODO: clean up
-            raise EngineDiedException(f"Engine for {cn.next_player} ({engine.config}) died")
+        if engine.katago_process.poll() is not None:
+            raise Exception(f"Engine for {cn.next_player} ({engine.config}) died")
         if time.time() - start > MAX_WAIT_ANALYSIS:
             logger.log(f"Waiting for analysis timed out!", OUTPUT_ERROR)
             return
