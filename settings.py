@@ -15,6 +15,8 @@ class Logger(KaTrainBase):
         if level <= self.output_level:
             print(msg, file=sys.stderr)
 
+    def __call__(self, *args):
+        print(*args)
 
 bot_strategies = {
     "dev": (
@@ -24,8 +26,8 @@ bot_strategies = {
     ),
     "dev-beta": (
         AI_SIMPLE_OWNERSHIP,
-        {"max_points_lost": 1.75, "settled_weight": 1.0, "opponent_fac": 0.5},
-        {"max_visits": 500, "wide_root_noise": 0.02},
+        {"max_points_lost": 1.75, "settled_weight": 1.0, "opponent_fac": 0.5, "attach_penalty": 1, "tenuki_penalty": 0.5},
+        {"max_visits": 100, "wide_root_noise": 0.02},
     ),
     "strong": (
         AI_SIMPLE_OWNERSHIP,

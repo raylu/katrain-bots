@@ -10,7 +10,7 @@ import traceback
 from katrain.core.ai import generate_ai_move
 from katrain.core.base_katrain import KaTrainBase
 from katrain.core.constants import *
-from katrain.core.constants import OUTPUT_ERROR, OUTPUT_INFO
+from katrain.core.constants import OUTPUT_ERROR, OUTPUT_INFO, OUTPUT_DEBUG
 from katrain.core.engine import KataGoEngine
 from katrain.core.game import Game
 from katrain.core.sgf_parser import Move
@@ -82,7 +82,7 @@ def format_rank(rank):
 def malkovich_analysis(cn):
     start = time.time()
     while not cn.analysis_complete:
-        time.sleep(0.001)
+        time.sleep(0.01)
         if engine.katago_process.poll() is not None:
             raise Exception(f"Engine for {cn.next_player} ({engine.config}) died")
         if time.time() - start > MAX_WAIT_ANALYSIS:

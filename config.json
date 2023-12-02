@@ -2,7 +2,7 @@
     "engine": {
         "katago": "",
         "altcommand": "",
-        "model": "katrain/models/g170e-b15c192-s1672170752-d466197061.bin.gz",
+        "model": "/home/raylu/katago/default_model.bin.gz",
         "config": "katrain/KataGo/analysis_config.cfg",
         "threads": 12,
         "max_visits": 500,

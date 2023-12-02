@@ -10,11 +10,11 @@ from katrain.core.constants import OUTPUT_INFO, OUTPUT_DEBUG
 from katrain.core.engine import KataGoEngine
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8587
-KATA = sys.argv[2] if len(sys.argv) > 2 else "katago/katago-allowner-eigen"
+KATA = sys.argv[2] if len(sys.argv) > 2 else "/home/raylu/katago/katago"
 
 ENGINE_SETTINGS = {
     "katago": KATA,
-    "model": "katrain/models/g170e-b15c192-s1672170752-d466197061.bin.gz",
+    "model": "/home/raylu/katago/default_model.bin.gz",
     "config": "katrain/KataGo/analysis_config.cfg",
     "max_visits": 10,
     "max_time": 1.0,
@@ -24,6 +24,9 @@ ENGINE_SETTINGS = {
 
 
 class Logger:
+    def __call__(self, *args):
+        print(*args)
+
     def log(self, msg, level):
         if level <= OUTPUT_DEBUG:
             print(f"[{level} {msg}")
