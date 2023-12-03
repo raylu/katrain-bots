@@ -121,7 +121,9 @@ def malkovich_analysis(cn):
 while True:
     line = input().strip()
     logger.log(f"GOT INPUT {line}", OUTPUT_ERROR)
-    if line.startswith("boardsize"):
+    if line.startswith("list_commands"):
+        print("= \nlist_commands\nboardsize\nkomi\nplace_free_handicap\nset_free_handicap\ngenmove\nplay\nfinal_score\nquit\n")
+    elif line.startswith("boardsize"):
         _, *size = line.strip().split(" ")
         if len(size) > 1:
             size = f"{size[0]}:{size[1]}"
