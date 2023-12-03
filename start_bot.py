@@ -13,7 +13,7 @@ MAXGAMES = 10
 GTP2OGS = "/home/raylu/src/gtp2ogs/packaged/gtp2ogs-linux"
 
 #username = f"katrain-{bot}"
-username = "raylubot"
+username = "simplebot katrain"
 
 with open("config.json") as f:
     settings = json.load(f)
@@ -34,6 +34,6 @@ APIKEY = apikeys[username]
 settings_dump = ", ".join(f"{k}={v}" for k, v in ai_settings.items() if not k.startswith("_"))
 print(settings_dump)
 
-cmd = f'{GTP2OGS} --apikey {APIKEY} --beta -- python ai2gtp.py {bot} {port}'
+cmd = f'{GTP2OGS} --apikey {APIKEY} --config gtp2ogs.json5 -- python ai2gtp.py {bot} {port}'
 print(f"starting bot {username} using server port {port} --> {cmd}")
 os.system(cmd)
