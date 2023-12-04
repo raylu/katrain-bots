@@ -8,14 +8,11 @@ import time
 import traceback
 
 from katrain.core.ai import generate_ai_move
-from katrain.core.base_katrain import KaTrainBase
-from katrain.core.constants import *
-from katrain.core.constants import OUTPUT_ERROR, OUTPUT_INFO, OUTPUT_DEBUG
+from katrain.core.constants import AI_SIMPLE_OWNERSHIP, OUTPUT_ERROR, OUTPUT_INFO
 from katrain.core.engine import KataGoEngine
 from katrain.core.game import Game
 from katrain.core.sgf_parser import Move
 
-from rank_utils import rank_game
 from settings import DEFAULT_PORT, Logger, bot_strategies
 
 os.environ["KCFG_KIVY_LOG_LEVEL"] = os.environ.get("KCFG_KIVY_LOG_LEVEL", "warning")
@@ -86,7 +83,7 @@ def malkovich_analysis(cn):
         if engine.katago_process.poll() is not None:
             raise Exception(f"Engine for {cn.next_player} ({engine.config}) died")
         if time.time() - start > MAX_WAIT_ANALYSIS:
-            logger.log(f"Waiting for analysis timed out!", OUTPUT_ERROR)
+            logger.log("Waiting for analysis timed out!", OUTPUT_ERROR)
             return
     if cn.analysis_complete and cn.parent and cn.parent.analysis_complete:
         dscore = cn.analysis["root"]["scoreLead"] - cn.parent.analysis["root"]["scoreLead"]
@@ -154,7 +151,7 @@ while True:
         sys.stdout.flush()
         game.analyze_all_nodes()  # re-evaluate root
         while engine.queries:  # and make sure this gets processed
-            time.sleep(0.001)
+            time.sleep(0.01)
         continue
     elif line.startswith("set_free_handicap"):
         _, *stones = line.split(" ")
@@ -162,7 +159,7 @@ while True:
         game._calculate_groups()
         game.analyze_all_nodes()  # re-evaluate root
         while engine.queries:  # and make sure this gets processed
-            time.sleep(0.001)
+            time.sleep(0.01)
         logger.log(f"Set handicap placements to {game.root.get_list_property('AB')}", OUTPUT_ERROR)
     elif line.startswith("genmove"):
         _, player = line.strip().split(" ")
@@ -170,7 +167,7 @@ while True:
             logger.log(
                 f"ERROR generating move: UNEXPECTED PLAYER {player} != {game.current_node.next_player}.", OUTPUT_ERROR
             )
-            print(f"= ??\n")
+            print("= ??\n")
             sys.stdout.flush()
             continue
         logger.log(f"{ai_strategy} generating move", OUTPUT_ERROR)
@@ -239,8 +236,8 @@ while True:
         sys.stdout.flush()
         continue
     elif line.startswith("quit"):
-        print(f"= \n")
+        print("= \n")
         break
-    print(f"= \n")
+    print("= \n")
     sys.stdout.flush()
     sys.stderr.flush()
