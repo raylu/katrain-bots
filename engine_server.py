@@ -50,6 +50,8 @@ def engine_thread(conn: socket.socket, addr):
                 query["id"] = tag + str(query["id"])
 
                 def callback(analysis, *args):
+                    if analysis.get("isDuringSearch", False):
+                        return # ignore partial result
                     print(f"Returning {analysis['id']} visits {analysis['rootInfo']['visits']} for {addr} -> {len(engine.queries)} outstanding queries")
                     analysis["id"] = analysis["id"][len(tag) :]
                     sockfile.write(json.dumps(analysis) + "\n")

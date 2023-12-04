@@ -170,7 +170,7 @@ while True:
             sys.stdout.flush()
             continue
         logger.log(f"{ai_strategy} generating move", OUTPUT_ERROR)
-        game.current_node.analyze(engine)
+        game.current_node.analyze(engine, report_every=None)
         malkovich_analysis(game.current_node)
         game.root.properties[f"P{game.current_node.next_player}"] = [f"KaTrain {ai_strategy}"]
         num_passes = sum(
