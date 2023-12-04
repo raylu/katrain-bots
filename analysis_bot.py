@@ -3,8 +3,6 @@
 import argparse
 import json
 import subprocess
-import time
-from threading import Thread
 from typing import Union, Literal, Any
 
 import sgfmill
@@ -24,46 +22,31 @@ class KataGo:
 	def __init__(self, katago_path: str, config_path: str, model_path: str, additional_args: list[str] = []):
 		self.query_counter = 0
 		katago = subprocess.Popen(
-			[katago_path, 'analysis', '-config', config_path, '-model', model_path, *additional_args],
-			stdin=subprocess.PIPE,
-			stdout=subprocess.PIPE,
-			stderr=subprocess.PIPE,
-		)
+				[katago_path, 'analysis', '-config', config_path, '-model', model_path, *additional_args],
+				stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 		self.katago = katago
-		def printforever():
-			while katago.poll() is None:
-				data = katago.stderr.readline()
-				time.sleep(0)
-				if data:
-					print('KataGo: ', data.decode(), end='')
-			data = katago.stderr.read()
-			if data:
-				print('KataGo: ', data.decode(), end='')
-		self.stderrthread = Thread(target=printforever)
-		self.stderrthread.start()
 
 	def close(self):
 		self.katago.stdin.close()
 
-
 	def query(self, initial_board: sgfmill.boards.Board, moves: list[tuple[Color, Move]], komi: float, max_visits=None):
-		query = {}
-
-		query['id'] = str(self.query_counter)
+		query = {
+			'id': str(self.query_counter),
+			'moves': [(color, sgfmill_to_str(move)) for color, move in moves],
+			'initialStones': [],
+			'rules': 'Chinese',
+			'komi': komi,
+			'boardXSize': initial_board.side,
+			'boardYSize': initial_board.side,
+			'includePolicy': True,
+		}
 		self.query_counter += 1
 
-		query['moves'] = [(color, sgfmill_to_str(move)) for color, move in moves]
-		query['initialStones'] = []
 		for y in range(initial_board.side):
 			for x in range(initial_board.side):
 				color = initial_board.get(y, x)
 				if color:
 					query['initialStones'].append((color, sgfmill_to_str((y, x))))
-		query['rules'] = 'Chinese'
-		query['komi'] = komi
-		query['boardXSize'] = initial_board.side
-		query['boardYSize'] = initial_board.side
-		query['includePolicy'] = True
 		if max_visits is not None:
 			query['maxVisits'] = max_visits
 		return self.query_raw(query)
@@ -72,20 +55,12 @@ class KataGo:
 		self.katago.stdin.write((json.dumps(query) + '\n').encode())
 		self.katago.stdin.flush()
 
-		# print(json.dumps(query))
-
-		line = ''
-		while line == '':
-			if self.katago.poll():
-				time.sleep(1)
+		while True:
+			if self.katago.poll() is not None:
 				raise Exception('Unexpected katago exit')
 			line = self.katago.stdout.readline()
-			line = line.decode().strip()
-			# print('Got: ' + line)
-		response = json.loads(line)
-
-		# print(response)
-		return response
+			if line != '':
+				return json.loads(line.decode())
 
 if __name__ == '__main__':
 	description = """
@@ -108,7 +83,6 @@ if __name__ == '__main__':
 		required=True,
 	)
 	args = vars(parser.parse_args())
-	print(args)
 
 	katago = KataGo(args['katago_path'], args['config_path'], args['model_path'])
 
