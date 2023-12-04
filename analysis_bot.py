@@ -62,30 +62,8 @@ class KataGo:
 			if line != '':
 				return json.loads(line.decode())
 
-if __name__ == '__main__':
-	description = """
-	Example script showing how to run KataGo analysis engine and query it from python.
-	"""
-	parser = argparse.ArgumentParser(description=description)
-	parser.add_argument(
-		'--katago-path',
-		help='Path to katago executable',
-		required=True,
-	)
-	parser.add_argument(
-		'--config-path',
-		help='Path to KataGo analysis config (e.g. cpp/configs/analysis_example.cfg in KataGo repo)',
-		required=True,
-	)
-	parser.add_argument(
-		'--model-path',
-		help='Path to neural network .bin.gz file',
-		required=True,
-	)
-	args = vars(parser.parse_args())
-
-	katago = KataGo(args['katago_path'], args['config_path'], args['model_path'])
-
+def main():
+	katago = args_to_katago()
 	board = sgfmill.boards.Board(19)
 	komi = 6.5
 	moves = [('b', (3, 3))]
@@ -101,3 +79,20 @@ if __name__ == '__main__':
 	print(katago.query(board, moves, komi))
 
 	katago.close()
+
+def args_to_katago() -> KataGo:
+	description = """
+	Example script showing how to run KataGo analysis engine and query it from python.
+	"""
+	parser = argparse.ArgumentParser(description=description)
+	parser.add_argument('--katago-path', help='Path to katago executable', required=True)
+	parser.add_argument('--config-path',
+			help='Path to KataGo analysis config (e.g. cpp/configs/analysis_example.cfg in KataGo repo)',
+			required=True)
+	parser.add_argument('--model-path', help='Path to neural network .bin.gz file', required=True)
+	args = vars(parser.parse_args())
+
+	return KataGo(args['katago_path'], args['config_path'], args['model_path'])
+
+if __name__ == '__main__':
+	main()
