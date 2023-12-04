@@ -76,7 +76,7 @@ def format_rank(rank):
         return f"{rank:.1f}k"
 
 
-def malkovich_analysis(cn):
+def malkovich_analysis(cn) -> bool:
     start = time.time()
     while not cn.analysis_complete:
         time.sleep(0.01)
@@ -117,7 +117,6 @@ def malkovich_analysis(cn):
 
 while True:
     line = input().strip()
-    logger.log(f"GOT INPUT {line}", OUTPUT_ERROR)
     if line.startswith("list_commands"):
         print("= \nlist_commands\nboardsize\nkomi\nplace_free_handicap\nset_free_handicap\ngenmove\nplay\nfinal_score\nquit\n")
     elif line.startswith("boardsize"):

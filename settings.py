@@ -1,6 +1,6 @@
 import sys
 
-from katrain.core.base_katrain import KaTrainBase, Player
+from katrain.core.base_katrain import KaTrainBase
 from katrain.core.constants import *
 
 DEFAULT_PORT = 8587

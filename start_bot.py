@@ -4,7 +4,7 @@ import sys
 from settings import bot_strategies, greetings
 
 if len(sys.argv) < 2:
-    exit(0)
+    exit(1)
 
 bot = sys.argv[1].strip()
 port = int(sys.argv[2]) if len(sys.argv) > 2 else 8587
@@ -28,12 +28,15 @@ with open("secret/apikey.json") as f:
 
 if bot not in greetings or username not in apikeys:
     print(f"BOT {username} NOT FOUND")
-    exit(1)
+    exit(2)
 
 APIKEY = apikeys[username]
 settings_dump = ", ".join(f"{k}={v}" for k, v in ai_settings.items() if not k.startswith("_"))
 print(settings_dump)
 
-cmd = f'{GTP2OGS} --apikey {APIKEY} --config gtp2ogs.json5 -- python ai2gtp.py {bot} {port}'
-print(f"starting bot {username} using server port {port} --> {cmd}")
-os.system(cmd)
+cmd = [GTP2OGS, '--apikey', APIKEY, '--config', 'gtp2ogs.json5']
+if username.endswith('-beta'):
+    cmd.append('--beta')
+cmd += ['--', 'python3', 'ai2gtp.py', bot, str(port)]
+print(f"starting bot {username} using server port {port} --> {' '.join(cmd)}")
+os.execv(cmd[0], cmd)

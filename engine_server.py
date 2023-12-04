@@ -6,7 +6,7 @@ import sys
 import threading
 import traceback
 
-from katrain.core.constants import OUTPUT_INFO, OUTPUT_DEBUG
+from katrain.core.constants import OUTPUT_DEBUG
 from katrain.core.engine import KataGoEngine
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8587
@@ -35,7 +35,7 @@ print(ENGINE_SETTINGS)
 engine = KataGoEngine(Logger(), ENGINE_SETTINGS)
 
 
-def engine_thread(conn, addr):
+def engine_thread(conn: socket.socket, addr):
     sockfile = conn.makefile(mode="rw")
     try:
         while True:
@@ -71,7 +71,7 @@ def engine_thread(conn, addr):
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.bind(("localhost", PORT))
 sock.listen(100)
-print("Listening..")
+print("Listening...")
 while True:
     conn, addr = sock.accept()
     print(f"Accepted connection from {addr}")
