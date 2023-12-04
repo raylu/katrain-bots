@@ -10,18 +10,22 @@ import sgfmill.ascii_boards
 import sgfmill.boards
 
 Color = Union[Literal['b'], Literal['w']]
-Move = Union[None, Literal['pass'], tuple[int, int]]
+Move = Union[Literal['pass'], tuple[int, int]]
 COLS = 'ABCDEFGHJKLMNOPQRSTUVWXYZ'
 
-def sgfmill_to_str(move: Move) -> str:
-	if move in (None, 'pass'):
-		return 'pass'
-	(y, x) = move
-	return COLS[x] + str(y + 1)
+MAX_POINTS_LOST = 5.0
+SETTLED_WEIGHT = 1.0
+MIN_VISITS = 3
+ATTACH_PENALTY = 1.0
+TENUKI_PENALTY = 0.5
+OPPONENT_FAC = 0.5
 
-def str_to_sgfmill(s: str) -> Move:
-	return int(s[1:]) - 1, COLS.index(s[0])
-
+def main():
+	katago = args_to_katago()
+	try:
+		GTPEngine(katago).run()
+	finally:
+		katago.close()
 
 class KataGo:
 	def __init__(self, katago_path: str, config_path: str, model_path: str, additional_args: list[str] = []):
@@ -43,6 +47,7 @@ class KataGo:
 			'komi': komi,
 			'boardXSize': size,
 			'boardYSize': size,
+			'includeMovesOwnership': True,
 		}
 		self.query_counter += 1
 
@@ -66,13 +71,6 @@ class KataGo:
 			if line != '':
 				return json.loads(line.decode())
 
-def main():
-	katago = args_to_katago()
-	try:
-		GTPEngine(katago).run()
-	finally:
-		katago.close()
-
 def args_to_katago() -> KataGo:
 	description = """
 	Example script showing how to run KataGo analysis engine and query it from python.
@@ -94,6 +92,7 @@ class GTPEngine:
 			'list_commands': self.list_commands,
 			'boardsize': self.boardsize,
 			'genmove': self.genmove,
+			# TODO: komi, play, place_free_handicap, set_free_handicap
 		}
 		self.size = 19
 		self.board = sgfmill.boards.Board(self.size)
@@ -136,37 +135,44 @@ class GTPEngine:
 		analysis = self.katago.query(self.size, self.moves, komi, max_visits=100)
 		assert analysis['rootInfo']['currentPlayer'] == self.next_player.upper()
 		candidate_ai_moves = candidate_moves(analysis, sign)
-		'''
-		stones_with_player = {(*s.coords, s.player) for s in game.stones}
+		
+		if self.next_player == 'b':
+			opponent = 'w'
+		else:
+			opponent = 'b'
 
-		def settledness(d, player_sign):
+		def settledness(d: dict, player_sign: int) -> float:
 			return sum([abs(o) for o in d["ownership"] if player_sign * o > 0])
 
-		def is_attachment(move):
-			if move.is_pass:
+		def is_attachment(move: str) -> bool:
+			if move == 'pass':
 				return False
+			x, y = str_to_sgfmill(move)
 			attach_opponent_stones = sum(
-				(move.coords[0] + dx, move.coords[1] + dy, cn.player) in stones_with_player
+				self.board.get(x + dx, y + dy) == opponent
 				for dx in [-1, 0, 1]
 				for dy in [-1, 0, 1]
 				if abs(dx) + abs(dy) == 1
 			)
 			nearby_own_stones = sum(
-				(move.coords[0] + dx, move.coords[1] + dy, cn.next_player) in stones_with_player
+				self.board.get(x + dx, y + dy) == self.next_player
 				for dx in [-2, 0, 1, 2]
 				for dy in [-2 - 1, 0, 1, 2]
 				if abs(dx) + abs(dy) <= 2  # allows clamps/jumps
 			)
 			return attach_opponent_stones >= 1 and nearby_own_stones == 0
 
-		def is_tenuki(d):
-			return not d.is_pass and not any(
-				not node
-				or not node.move
-				or node.move.is_pass
-				or max(abs(last_c - cand_c) for last_c, cand_c in zip(node.move.coords, d.coords)) < 5
-				for node in [cn, cn.parent]
-			)
+		def is_tenuki(move: str) -> bool:
+			if move == 'pass' or len(self.moves) < 2:
+				return False
+			move_coords = str_to_sgfmill(move)
+			for prev in self.moves[-2:]:
+				_, prev_move = prev
+				if prev_move == 'pass':
+					return False
+				if max(abs(last_c - cand_c) for last_c, cand_c in zip(prev_move, move_coords)) < 5:
+					return False
+			return True
 
 		moves_with_settledness = sorted(
 			[
@@ -179,37 +185,44 @@ class GTPEngine:
 					d,
 				)
 				for d in candidate_ai_moves
-				if d["pointsLost"] < ai_settings["max_points_lost"]
+				if d["pointsLost"] < MAX_POINTS_LOST
 				and "ownership" in d
-				and (d["order"] <= 1 or d["visits"] >= ai_settings.get("min_visits", 1))
-				for move in [Move.from_gtp(d["move"], player=cn.next_player)]
-				if not (move.is_pass and d["pointsLost"] > 0.75)
+				and (d["order"] <= 1 or d["visits"] >= MIN_VISITS)
+				for move in [d["move"]]
+				if not (move == 'pass' and d["pointsLost"] > 0.75)
 			],
 			key=lambda t: t[5]["pointsLost"]
-			+ ai_settings["attach_penalty"] * t[3]
-			+ ai_settings["tenuki_penalty"] * t[4]
-			- ai_settings["settled_weight"] * (t[1] + ai_settings["opponent_fac"] * t[2]),
+			+ ATTACH_PENALTY * t[3]
+			+ TENUKI_PENALTY * t[4]
+			- SETTLED_WEIGHT * (t[1] + OPPONENT_FAC * t[2]),
 		)
 		if not moves_with_settledness:
 			raise Exception("No moves found - are you using an older KataGo with no per-move ownership info?")
 		cands = [
-			f"{move.gtp()} ({d['pointsLost']:.1f} pt lost, {d['visits']} visits, {settled:.1f} settledness, {oppsettled:.1f} opponent settledness{', attachment' if isattach else ''}{', tenuki' if istenuki else ''})"
+			f"{move} ({d['pointsLost']:.1f} pt lost, {d['visits']} visits, {settled:.1f} settledness, {oppsettled:.1f} opponent settledness{', attachment' if isattach else ''}{', tenuki' if istenuki else ''})"
 			for move, settled, oppsettled, isattach, istenuki, d in moves_with_settledness[:5]
 		]
-		ai_thoughts += f"top 5 candidates {', '.join(cands)} "
+		ai_thoughts = f"top 5 candidates {', '.join(cands)} "
 		ai_move = moves_with_settledness[0][0]
-		'''
 
-		best_move = candidate_ai_moves[0]['move']
-		best_move_coords = str_to_sgfmill(best_move)
-		self.moves.append((args[0], best_move_coords))
-		self.board.play(best_move_coords[0], best_move_coords[1], self.next_player)
-		print(sgfmill.ascii_boards.render_board(self.board), file=sys.stderr)
-		if self.next_player == 'b':
-			self.next_player = 'w'
+		if ai_move == 'pass':
+			self.moves.append((args[0], 'pass'))
 		else:
-			self.next_player = 'b'
-		return best_move
+			ai_move_coords = str_to_sgfmill(ai_move)
+			self.moves.append((args[0], ai_move_coords))
+			self.board.play(ai_move_coords[0], ai_move_coords[1], self.next_player)
+		print(sgfmill.ascii_boards.render_board(self.board), file=sys.stderr)
+		self.next_player = opponent
+		return ai_move
+
+def sgfmill_to_str(move: Move) -> str:
+	if move in (None, 'pass'):
+		return 'pass'
+	(y, x) = move
+	return COLS[x] + str(y + 1)
+
+def str_to_sgfmill(s: str) -> tuple[int, int]:
+	return int(s[1:]) - 1, COLS.index(s[0])
 
 def candidate_moves(analysis: dict, sign: int) -> list[dict]:
 	# https://github.com/sanderland/katrain/blob/98ce47c3bc5f1c8c1a9cc03120e4afcd2cf677db/katrain/core/game_node.py#L412
