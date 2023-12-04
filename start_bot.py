@@ -13,6 +13,7 @@ MAXGAMES = 10
 GTP2OGS = "/home/raylu/src/gtp2ogs/packaged/gtp2ogs-linux"
 
 #username = f"katrain-{bot}"
+#username = "raylubot-beta"
 username = "simplebot katrain"
 
 with open("config.json") as f:
