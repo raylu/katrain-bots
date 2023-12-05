@@ -91,10 +91,13 @@ class GTPEngine:
 		self.commands = {
 			'list_commands': self.list_commands,
 			'boardsize': self.boardsize,
+			'komi': self.set_komi,
+			'play': self.play,
 			'genmove': self.genmove,
-			# TODO: komi, play, place_free_handicap, set_free_handicap
+			# TODO: place_free_handicap, set_free_handicap
 		}
 		self.size = 19
+		self.komi = 7.5
 		self.board = sgfmill.boards.Board(self.size)
 		self.moves: list[tuple[Color, Move]] = []
 		self.next_player: Color = 'b'
@@ -127,12 +130,31 @@ class GTPEngine:
 		self.board = sgfmill.boards.Board(self.size)
 		return ''
 
+	def set_komi(self, args: str) -> str:
+		self.komi = float(args)
+		return ''
+
+	def play(self, args: str) -> str:
+		player, move = args.split()
+		assert player in ('black', 'white')
+		if move == 'pass':
+			self.moves.append((args[0], 'pass'))
+		else:
+			coords = str_to_sgfmill(move.upper())
+			self.moves.append((args[0], coords))
+			self.board.play(coords[0], coords[1], args[0])
+
+		if args[0] == 'b':
+			self.next_player = 'w'
+		else:
+			self.next_player = 'b'
+		return ''
+
 	def genmove(self, args: str) -> str:
 		assert args[0] == self.next_player
 		sign = {'b': 1, 'w': -1}[self.next_player]
 
-		komi = 6.5
-		analysis = self.katago.query(self.size, self.moves, komi, max_visits=100)
+		analysis = self.katago.query(self.size, self.moves, self.komi, max_visits=100)
 		assert analysis['rootInfo']['currentPlayer'] == self.next_player.upper()
 		candidate_ai_moves = candidate_moves(analysis, sign)
 		
@@ -210,7 +232,7 @@ class GTPEngine:
 			self.moves.append((args[0], 'pass'))
 		else:
 			ai_move_coords = str_to_sgfmill(ai_move)
-			self.moves.append((args[0], ai_move_coords))
+			self.moves.append((self.next_player, ai_move_coords))
 			self.board.play(ai_move_coords[0], ai_move_coords[1], self.next_player)
 		print(sgfmill.ascii_boards.render_board(self.board), file=sys.stderr)
 		self.next_player = opponent
