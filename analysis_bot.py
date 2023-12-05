@@ -109,6 +109,8 @@ class GTPEngine:
 			except EOFError:
 				break
 			command = split[0]
+			if command == 'quit':
+				break
 			handler = self.commands.get(command)
 			if handler is None:
 				response = ''
@@ -119,7 +121,6 @@ class GTPEngine:
 				response = handler(args)
 			print(f'= {response}\n')
 			sys.stdout.flush()
-		return
 
 	def list_commands(self, args: str) -> str:
 		return '\n'.join(self.commands.keys())
