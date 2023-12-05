@@ -101,6 +101,7 @@ class GTPEngine:
 		self.board = sgfmill.boards.Board(self.size)
 		self.moves: list[tuple[Color, Move]] = []
 		self.next_player: Color = 'b'
+		self.score_lead = None
 
 	def run(self) -> None:
 		while True:
@@ -157,6 +158,15 @@ class GTPEngine:
 		analysis = self.katago.query(self.size, self.moves, self.komi, max_visits=100)
 		assert analysis['rootInfo']['currentPlayer'] == self.next_player.upper()
 		candidate_ai_moves = candidate_moves(analysis, sign)
+
+		if self.score_lead is not None:
+			current_lead = analysis['rootInfo']['scoreLead']
+			score_delta = abs(current_lead - self.score_lead)
+			if score_delta > 2.0:
+				last_move = sgfmill_to_str(self.moves[-1][1])
+				print(f'MALKOVICH:{last_move} caused a significant score change: {score_delta:.1f} points.',
+						f'score lead: {current_lead:.1f}', file=sys.stderr)
+		self.score_lead = analysis['rootInfo']['scoreLead']
 		
 		if self.next_player == 'b':
 			opponent = 'w'
@@ -164,20 +174,26 @@ class GTPEngine:
 			opponent = 'b'
 
 		def settledness(d: dict, player_sign: int) -> float:
-			return sum([abs(o) for o in d["ownership"] if player_sign * o > 0])
+			return sum([abs(o) for o in d['ownership'] if player_sign * o > 0])
+
+		def board_pos(x: int, y: int) -> Color | None:
+			try:
+				return self.board.get(x, y)
+			except IndexError:
+				return None
 
 		def is_attachment(move: str) -> bool:
 			if move == 'pass':
 				return False
 			x, y = str_to_sgfmill(move)
 			attach_opponent_stones = sum(
-				self.board.get(x + dx, y + dy) == opponent
+				board_pos(x + dx, y + dy) == opponent
 				for dx in [-1, 0, 1]
 				for dy in [-1, 0, 1]
 				if abs(dx) + abs(dy) == 1
 			)
 			nearby_own_stones = sum(
-				self.board.get(x + dx, y + dy) == self.next_player
+				board_pos(x + dx, y + dy) == self.next_player
 				for dx in [-2, 0, 1, 2]
 				for dy in [-2 - 1, 0, 1, 2]
 				if abs(dx) + abs(dy) <= 2  # allows clamps/jumps
@@ -220,13 +236,14 @@ class GTPEngine:
 		)
 		if not moves_with_settledness:
 			raise Exception("No moves found - are you using an older KataGo with no per-move ownership info?")
+		ai_move = moves_with_settledness[0][0]
+
 		cands = [
 			f"{move} ({d['pointsLost']:.1f} pt lost, {d['visits']} visits, {settled:.1f} settledness, {oppsettled:.1f} opponent settledness{', attachment' if isattach else ''}{', tenuki' if istenuki else ''})"
 			for move, settled, oppsettled, isattach, istenuki, d in moves_with_settledness[:5]
 		]
 		ai_thoughts = f"top 5 candidates {', '.join(cands)} "
 		print(ai_thoughts, file=sys.stderr)
-		ai_move = moves_with_settledness[0][0]
 
 		if ai_move == 'pass':
 			self.moves.append((args[0], 'pass'))
@@ -234,12 +251,12 @@ class GTPEngine:
 			ai_move_coords = str_to_sgfmill(ai_move)
 			self.moves.append((self.next_player, ai_move_coords))
 			self.board.play(ai_move_coords[0], ai_move_coords[1], self.next_player)
-		print(sgfmill.ascii_boards.render_board(self.board), file=sys.stderr)
+		# print(sgfmill.ascii_boards.render_board(self.board), file=sys.stderr)
 		self.next_player = opponent
 		return ai_move
 
 def sgfmill_to_str(move: Move) -> str:
-	if move in (None, 'pass'):
+	if move == 'pass':
 		return 'pass'
 	(y, x) = move
 	return COLS[x] + str(y + 1)
