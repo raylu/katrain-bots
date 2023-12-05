@@ -203,6 +203,7 @@ class GTPEngine:
 			for move, settled, oppsettled, isattach, istenuki, d in moves_with_settledness[:5]
 		]
 		ai_thoughts = f"top 5 candidates {', '.join(cands)} "
+		print(ai_thoughts, file=sys.stderr)
 		ai_move = moves_with_settledness[0][0]
 
 		if ai_move == 'pass':
