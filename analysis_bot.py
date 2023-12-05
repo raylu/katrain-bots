@@ -100,6 +100,7 @@ class GTPEngine:
 		self.moves: list[tuple[Color, Move]] = []
 		self.next_player: Color = 'b'
 		self.score_lead = None
+		self.consecutive_passes = 0
 
 	def run(self) -> None:
 		while True:
@@ -138,10 +139,12 @@ class GTPEngine:
 		assert player in ('black', 'white')
 		if move == 'pass':
 			self.moves.append((args[0], 'pass'))
+			self.consecutive_passes += 1
 		else:
 			coords = str_to_sgfmill(move.upper())
 			self.moves.append((args[0], coords))
 			self.board.play(coords[0], coords[1], args[0])
+			self.consecutive_passes = 0
 
 		if args[0] == 'b':
 			self.next_player = 'w'
@@ -151,8 +154,29 @@ class GTPEngine:
 
 	def genmove(self, args: str) -> str:
 		assert args[0] == self.next_player
-		sign = {'b': 1, 'w': -1}[self.next_player]
+		if self.next_player == 'b':
+			opponent = 'w'
+		else:
+			opponent = 'b'
 
+		if self.consecutive_passes >= 3 and len(self.moves) > 2 * self.size:
+			print(f"DISCUSSION:since you passed 3 times after move {2 * self.size}, I will pass as well", file=sys.stderr)
+			ai_move = 'pass'
+		else:
+			ai_move = self.query_ai_move(opponent)
+
+		if ai_move == 'pass':
+			self.moves.append((self.next_player, 'pass'))
+		else:
+			ai_move_coords = str_to_sgfmill(ai_move)
+			self.moves.append((self.next_player, ai_move_coords))
+			self.board.play(ai_move_coords[0], ai_move_coords[1], self.next_player)
+		# print(sgfmill.ascii_boards.render_board(self.board), file=sys.stderr)
+		self.next_player = opponent
+		return ai_move
+
+	def query_ai_move(self, opponent: Color) -> str:
+		sign = {'b': 1, 'w': -1}[self.next_player]
 		analysis = self.katago.query(self.size, self.moves, self.komi, max_visits=100)
 		assert analysis['rootInfo']['currentPlayer'] == self.next_player.upper()
 		candidate_ai_moves = candidate_moves(analysis, sign)
@@ -165,11 +189,6 @@ class GTPEngine:
 				print(f'MALKOVICH:{last_move} caused a significant score change: {score_delta:.1f} points.',
 						f'score lead: {current_lead:.1f}', file=sys.stderr)
 		self.score_lead = analysis['rootInfo']['scoreLead']
-		
-		if self.next_player == 'b':
-			opponent = 'w'
-		else:
-			opponent = 'b'
 
 		def settledness(d: dict, player_sign: int) -> float:
 			return sum([abs(o) for o in d['ownership'] if player_sign * o > 0])
@@ -242,15 +261,6 @@ class GTPEngine:
 		]
 		ai_thoughts = f"top 5 candidates {', '.join(cands)} "
 		print(ai_thoughts, file=sys.stderr)
-
-		if ai_move == 'pass':
-			self.moves.append((args[0], 'pass'))
-		else:
-			ai_move_coords = str_to_sgfmill(ai_move)
-			self.moves.append((self.next_player, ai_move_coords))
-			self.board.play(ai_move_coords[0], ai_move_coords[1], self.next_player)
-		# print(sgfmill.ascii_boards.render_board(self.board), file=sys.stderr)
-		self.next_player = opponent
 		return ai_move
 
 def sgfmill_to_str(move: Move) -> str:
