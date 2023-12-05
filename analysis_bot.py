@@ -72,9 +72,7 @@ class KataGo:
 				return json.loads(line.decode())
 
 def args_to_katago() -> KataGo:
-	description = """
-	Example script showing how to run KataGo analysis engine and query it from python.
-	"""
+	description = """run KataGo analysis engine as a GTP bot"""
 	parser = argparse.ArgumentParser(description=description)
 	parser.add_argument('--katago-path', help='Path to katago executable', required=True)
 	parser.add_argument('--config-path',
@@ -223,19 +221,19 @@ class GTPEngine:
 					d,
 				)
 				for d in candidate_ai_moves
-				if d["pointsLost"] < MAX_POINTS_LOST
-				and "ownership" in d
-				and (d["order"] <= 1 or d["visits"] >= MIN_VISITS)
-				for move in [d["move"]]
-				if not (move == 'pass' and d["pointsLost"] > 0.75)
+				if d['pointsLost'] < MAX_POINTS_LOST
+				and 'ownership' in d
+				and (d['order'] <= 1 or d['visits'] >= MIN_VISITS)
+				for move in [d['move']]
+				if not (move == 'pass' and d['pointsLost'] > 0.75)
 			],
-			key=lambda t: t[5]["pointsLost"]
+			key=lambda t: t[5]['pointsLost']
 			+ ATTACH_PENALTY * t[3]
 			+ TENUKI_PENALTY * t[4]
 			- SETTLED_WEIGHT * (t[1] + OPPONENT_FAC * t[2]),
 		)
 		if not moves_with_settledness:
-			raise Exception("No moves found - are you using an older KataGo with no per-move ownership info?")
+			raise Exception('No moves found - are you using an older KataGo with no per-move ownership info?')
 		ai_move = moves_with_settledness[0][0]
 
 		cands = [
