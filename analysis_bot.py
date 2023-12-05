@@ -38,11 +38,12 @@ class KataGo:
 	def close(self):
 		self.katago.stdin.close()
 
-	def query(self, size: int, moves: list[tuple[Color, Move]], komi: float, max_visits: int | None=None):
+	def query(self, size: int, moves: list[tuple[Color, str]], handicap_stones: list[tuple[Color, str]],
+		   komi: float, max_visits: int | None=None):
 		query = {
 			'id': str(self.query_counter),
-			'moves': [(color, sgfmill_to_str(move)) for color, move in moves],
-			'initialStones': [],
+			'moves': moves,
+			'initialStones': handicap_stones,
 			'rules': 'Chinese',
 			'komi': komi,
 			'boardXSize': size,
@@ -90,14 +91,16 @@ class GTPEngine:
 			'list_commands': self.list_commands,
 			'boardsize': self.boardsize,
 			'komi': self.set_komi,
+			'set_free_handicap': self.set_free_handicap,
 			'play': self.play,
 			'genmove': self.genmove,
-			# TODO: place_free_handicap, set_free_handicap
+			# TODO: place_free_handicap
 		}
 		self.size = 19
 		self.komi = 7.5
 		self.board = sgfmill.boards.Board(self.size)
-		self.moves: list[tuple[Color, Move]] = []
+		self.handicap_stones: list[tuple[Color, str]] = []
+		self.moves: list[tuple[Color, str]] = []
 		self.next_player: Color = 'b'
 		self.score_lead = None
 		self.consecutive_passes = 0
@@ -135,6 +138,15 @@ class GTPEngine:
 		self.komi = float(args)
 		return ''
 
+	def set_free_handicap(self, args: str) -> str:
+		self.next_player = 'w'
+		for stone in args.split():
+			stone = stone.upper()
+			coords = str_to_sgfmill(stone)
+			self.handicap_stones.append(('b', stone))
+			self.board.play(*coords, 'b')
+		return ''
+
 	def play(self, args: str) -> str:
 		player, move = args.split()
 		assert player in ('black', 'white')
@@ -142,9 +154,10 @@ class GTPEngine:
 			self.moves.append((args[0], 'pass'))
 			self.consecutive_passes += 1
 		else:
-			coords = str_to_sgfmill(move.upper())
-			self.moves.append((args[0], coords))
-			self.board.play(coords[0], coords[1], args[0])
+			move = move.upper()
+			self.moves.append((args[0], move))
+			coords = str_to_sgfmill(move)
+			self.board.play(*coords, args[0])
 			self.consecutive_passes = 0
 
 		if args[0] == 'b':
@@ -169,16 +182,16 @@ class GTPEngine:
 		if ai_move == 'pass':
 			self.moves.append((self.next_player, 'pass'))
 		else:
+			self.moves.append((self.next_player, ai_move))
 			ai_move_coords = str_to_sgfmill(ai_move)
-			self.moves.append((self.next_player, ai_move_coords))
-			self.board.play(ai_move_coords[0], ai_move_coords[1], self.next_player)
-		# print(sgfmill.ascii_boards.render_board(self.board), file=sys.stderr)
+			self.board.play(*ai_move_coords, self.next_player)
+		print(sgfmill.ascii_boards.render_board(self.board), file=sys.stderr)
 		self.next_player = opponent
 		return ai_move
 
 	def query_ai_move(self, opponent: Color) -> str:
 		sign = {'b': 1, 'w': -1}[self.next_player]
-		analysis = self.katago.query(self.size, self.moves, self.komi, max_visits=100)
+		analysis = self.katago.query(self.size, self.moves, self.handicap_stones, self.komi, max_visits=100)
 		assert analysis['rootInfo']['currentPlayer'] == self.next_player.upper()
 		candidate_ai_moves = candidate_moves(analysis, sign)
 
@@ -226,7 +239,8 @@ class GTPEngine:
 				_, prev_move = prev
 				if prev_move == 'pass':
 					return False
-				if max(abs(last_c - cand_c) for last_c, cand_c in zip(prev_move, move_coords)) < 5:
+				prev_move_coords = str_to_sgfmill(prev_move)
+				if max(abs(last_c - cand_c) for last_c, cand_c in zip(prev_move_coords, move_coords)) < 5:
 					return False
 			return True
 
