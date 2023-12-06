@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 
 import argparse
+import datetime
 import json
+import pathlib
 import subprocess
 import sys
+import traceback
 from typing import Any, Literal, Union
 
 import sgfmill.ascii_boards
@@ -99,6 +102,9 @@ class GTPEngine:
 		self.next_player: Color = 'b'
 		self.score_lead = None
 		self.consecutive_passes = 0
+		log_path = pathlib.Path('logs', datetime.datetime.now().isoformat())
+		log_path.parent.mkdir(exist_ok=True)
+		self.log_file = log_path.open('x', buffering=1)
 
 	def run(self) -> None:
 		while True:
@@ -116,9 +122,14 @@ class GTPEngine:
 				args = ''
 				if len(split) == 2:
 					args = split[1]
-				response = handler(args)
+				try:
+					response = handler(args)
+				except Exception:
+					self.log(traceback.format_exc())
+					raise
 			print(f'= {response}\n')
 			sys.stdout.flush()
+		self.log_file.close()
 
 	def list_commands(self, args: str) -> str:
 		return '\n'.join(self.commands.keys())
@@ -166,6 +177,7 @@ class GTPEngine:
 			coords = str_to_sgfmill(move)
 			self.board.play(*coords, args[0])
 			self.consecutive_passes = 0
+		self.log('opponent played', move)
 
 		if args[0] == 'b':
 			self.next_player = 'w'
@@ -194,6 +206,7 @@ class GTPEngine:
 			self.board.play(*ai_move_coords, self.next_player)
 		# print(sgfmill.ascii_boards.render_board(self.board), file=sys.stderr)
 		self.next_player = opponent
+		self.log('playing', ai_move)
 		return ai_move
 
 	def query_ai_move(self, opponent: Color) -> str:
@@ -206,7 +219,7 @@ class GTPEngine:
 			current_lead = analysis['rootInfo']['scoreLead']
 			score_delta = abs(current_lead - self.score_lead)
 			if score_delta > 2.0:
-				last_move = sgfmill_to_str(self.moves[-1][1])
+				last_move = self.moves[-1][1]
 				print(f'MALKOVICH:{last_move} caused a significant score change: {score_delta:.1f} points.',
 						f'score lead: {current_lead:.1f}', file=sys.stderr)
 		self.score_lead = analysis['rootInfo']['scoreLead']
@@ -282,8 +295,11 @@ class GTPEngine:
 			for move, settled, oppsettled, isattach, istenuki, d in moves_with_settledness[:5]
 		]
 		ai_thoughts = f"top 5 candidates {', '.join(cands)} "
-		print(ai_thoughts, file=sys.stderr)
+		self.log(ai_thoughts)
 		return ai_move
+
+	def log(self, *msg: str) -> None:
+		self.log_file.write(f'[{len(self.moves)}] {" ".join(msg)}\n')
 
 def sgfmill_to_str(move: Move) -> str:
 	if move == 'pass':
