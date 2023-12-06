@@ -9,8 +9,8 @@ import sys
 import traceback
 from typing import Any, Literal, Union
 
-import sgfmill.ascii_boards
-import sgfmill.boards
+import sgfmill.ascii_boards  # type: ignore[import]
+import sgfmill.boards  # type: ignore[import]
 
 Color = Union[Literal['b'], Literal['w']]
 Move = Union[Literal['pass'], tuple[int, int]]
@@ -33,10 +33,9 @@ def main():
 class KataGo:
 	def __init__(self, katago_path: str, config_path: str, model_path: str, additional_args: list[str] = []):
 		self.query_counter = 0
-		katago = subprocess.Popen(
+		self.katago = subprocess.Popen(
 				[katago_path, 'analysis', '-config', config_path, '-model', model_path, *additional_args],
 				stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-		self.katago = katago
 
 	def close(self):
 		self.katago.stdin.close()
@@ -60,6 +59,7 @@ class KataGo:
 		return self.query_raw(query)
 
 	def query_raw(self, query: dict[str, Any]):
+		assert self.katago.stdin and self.katago.stdout
 		self.katago.stdin.write((json.dumps(query) + '\n').encode())
 		self.katago.stdin.flush()
 
@@ -169,11 +169,11 @@ class GTPEngine:
 		player, move = args.split()
 		assert player in ('black', 'white')
 		if move == 'pass':
-			self.moves.append((args[0], 'pass'))
+			self.moves.append((player[0], 'pass')) # type: ignore[arg-type]
 			self.consecutive_passes += 1
 		else:
 			move = move.upper()
-			self.moves.append((args[0], move))
+			self.moves.append((player[0], move)) # type: ignore[arg-type]
 			coords = str_to_sgfmill(move)
 			self.board.play(*coords, args[0])
 			self.consecutive_passes = 0
@@ -188,7 +188,7 @@ class GTPEngine:
 	def genmove(self, args: str) -> str:
 		assert args[0] == self.next_player
 		if self.next_player == 'b':
-			opponent = 'w'
+			opponent: Color = 'w'
 		else:
 			opponent = 'b'
 
