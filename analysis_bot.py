@@ -7,7 +7,7 @@ import pathlib
 import subprocess
 import sys
 import traceback
-from typing import Any, Literal, Union
+from typing import Any, Literal, TextIO, Union
 
 import sgfmill.ascii_boards
 import sgfmill.boards
@@ -83,7 +83,7 @@ def args_to_katago() -> KataGo:
 	return KataGo(args['katago_path'], args['config_path'], args['model_path'])
 
 class GTPEngine:
-	def __init__(self, katago: KataGo) -> None:
+	def __init__(self, katago: KataGo, log_file: TextIO | None=None) -> None:
 		self.katago = katago
 		self.commands = {
 			'list_commands': self.list_commands,
@@ -102,9 +102,13 @@ class GTPEngine:
 		self.next_player: Color = 'b'
 		self.score_lead = None
 		self.consecutive_passes = 0
-		log_path = pathlib.Path('logs', datetime.datetime.now().isoformat())
-		log_path.parent.mkdir(exist_ok=True)
-		self.log_file = log_path.open('x', buffering=1)
+		if log_file is None:
+			log_path = pathlib.Path('logs', datetime.datetime.now().isoformat())
+			log_path.parent.mkdir(exist_ok=True)
+			self.log_file: TextIO = log_path.open('x', buffering=1)
+		else:
+			self.log_file = log_file
+			
 
 	def run(self) -> None:
 		while True:
