@@ -229,6 +229,9 @@ class GTPEngine:
 						f'score lead: {current_lead:.1f}', file=sys.stderr)
 		self.score_lead = analysis['rootInfo']['scoreLead']
 
+		if candidate_ai_moves[0]['move'] == 'pass':
+			return 'pass'
+
 		def settledness(d: dict, player_sign: int) -> float:
 			return sum([abs(o) for o in d['ownership'] if player_sign * o > 0])
 
@@ -269,23 +272,15 @@ class GTPEngine:
 					return False
 			return True
 
-		moves_with_settledness = sorted(
-			[
-				(
-					move,
-					settledness(d, sign),
-					settledness(d, -sign),
-					is_attachment(move),
-					is_tenuki(move),
-					d,
-				)
-				for d in candidate_ai_moves
-				if d['pointsLost'] < MAX_POINTS_LOST
-				and 'ownership' in d
-				and (d['order'] <= 1 or d['visits'] >= MIN_VISITS)
-				for move in [d['move']]
-				if not (move == 'pass' and d['pointsLost'] > 0.75)
-			],
+		moves_with_settledness = [
+			(d['move'], settledness(d, sign), settledness(d, -sign), is_attachment(d['move']), is_tenuki(d['move']), d)
+			for d in candidate_ai_moves
+			if d['pointsLost'] < MAX_POINTS_LOST
+			and 'ownership' in d
+			and (d['order'] <= 1 or d['visits'] >= MIN_VISITS)
+			and (d['move'] != 'pass' or d['pointsLost'] < 0.75)
+		]
+		moves_with_settledness.sort(
 			key=lambda t: t[5]['pointsLost']
 			+ ATTACH_PENALTY * t[3]
 			+ TENUKI_PENALTY * t[4]
@@ -305,8 +300,8 @@ class GTPEngine:
 		self.log(ai_thoughts)
 		return ai_move
 
-	def log(self, *msg: str) -> None:
-		self.log_file.write(f'[{len(self.moves)}] {" ".join(msg)}\n')
+	def log(self, *msg: Any) -> None:
+		self.log_file.write(f'[{len(self.moves)}] {" ".join(map(str, msg))}\n')
 
 def sgfmill_to_str(move: Move) -> str:
 	if move == 'pass':

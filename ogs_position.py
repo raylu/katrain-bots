@@ -18,7 +18,8 @@ def main() -> None:
 	game = r.json()
 	assert game['height'] == game['width']
 
-	katago = analysis_bot.KataGo('/home/raylu/katago/katago', 'katago_analysis.cfg', '/home/raylu/katago/default_model.bin.gz')
+	katago = analysis_bot.KataGo('/home/raylu/katago/katago', 'katago_analysis.cfg',
+			'/home/raylu/katago/default_model.bin.gz')
 	try:
 		analyze(katago, game, move_num)
 	finally:
@@ -50,7 +51,10 @@ def analyze(katago: analysis_bot.KataGo, game: dict, move_num: int) -> None:
 
 def place(engine: analysis_bot.GTPEngine, size: int, move: list[int], player: Color) -> None:
 	y, x, _ = move
-	engine.play(f'{player} {analysis_bot.sgfmill_to_str((size - x - 1, y))}')
+	if x == y == -1:
+		engine.play(f'{player} pass')
+	else:
+		engine.play(f'{player} {analysis_bot.sgfmill_to_str((size - x - 1, y))}')
 
 if __name__ == '__main__':
 	main()
