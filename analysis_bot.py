@@ -290,6 +290,14 @@ class GTPEngine:
 			raise Exception('No moves found - are you using an older KataGo with no per-move ownership info?')
 		ai_move = moves_with_settledness[0][0]
 
+		move_d = moves_with_settledness[0][5]
+		if 'pv' in move_d and move_d['pointsLost'] > 2.0:
+			print(f"DISCUSSION:{ai_move} causes me to lose {move_d['pointsLost']:.1f} points",
+					file=sys.stderr)
+			print(f"MALKOVICH:Visits {move_d['visits']} Winrate {move_d['winrate']:.2f}% "
+					f"ScoreLead {move_d['scoreLead'] * sign:.1f} ScoreStdev {move_d['scoreStdev']:.1f} "
+					f"PV {' '.join(move_d['pv'])}", file=sys.stderr)
+
 		cands = [
 			f"{move} ({d['pointsLost']:.1f} pt lost, {d['visits']} visits, {settled:.1f} settledness, "
 			f"{oppsettled:.1f} opponent settledness{', attachment' if isattach else ''}"
@@ -315,22 +323,16 @@ def str_to_sgfmill(s: str) -> tuple[int, int]:
 def candidate_moves(analysis: dict, sign: int) -> list[dict]:
 	# https://github.com/sanderland/katrain/blob/98ce47c3bc5f1c8c1a9cc03120e4afcd2cf677db/katrain/core/game_node.py#L412
 	root_score = analysis['rootInfo']['scoreLead']
-	root_winrate = analysis['rootInfo']['winrate']
 	move_dicts = analysis['moveInfos']
-	top_move = [d for d in move_dicts if d['order'] == 0]
-	top_score_lead = top_move[0]['scoreLead'] if top_move else root_score
-	return sorted(
-		[
-			{
-				'pointsLost': sign * (root_score - d['scoreLead']),
-				'relativePointsLost': sign * (top_score_lead - d['scoreLead']),
-				'winrateLost': sign * (root_winrate - d['winrate']),
-				**d,
-			}
-			for d in move_dicts
-		],
-		key=lambda d: (d['order'], d['pointsLost']),
-	)
+	moves = [
+		{
+			'pointsLost': sign * (root_score - d['scoreLead']),
+			**d,
+		}
+		for d in move_dicts
+	]
+	moves.sort(key=lambda d: (d['order'], d['pointsLost']))
+	return moves
 
 if __name__ == '__main__':
 	main()
