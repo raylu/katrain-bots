@@ -42,7 +42,7 @@ class KataGo:
 		self.katago.stdin.close()
 
 	def query(self, size: int, moves: list[tuple[Color, str]], handicap_stones: list[tuple[Color, str]],
-		   komi: float, max_visits: int | None=None):
+			komi: float, max_visits: int | None=None):
 		query = {
 			'id': str(self.query_counter),
 			'moves': moves,
@@ -193,7 +193,8 @@ class GTPEngine:
 			opponent = 'b'
 
 		if self.consecutive_passes >= 3 and len(self.moves) > 2 * self.size:
-			print(f"DISCUSSION:since you passed 3 times after move {2 * self.size}, I will pass as well", file=sys.stderr)
+			print(f'DISCUSSION:since you passed 3 times after move {2 * self.size}, I will pass as well',
+				file=sys.stderr)
 			ai_move = 'pass'
 		else:
 			ai_move = self.query_ai_move(opponent)
@@ -291,7 +292,9 @@ class GTPEngine:
 		ai_move = moves_with_settledness[0][0]
 
 		cands = [
-			f"{move} ({d['pointsLost']:.1f} pt lost, {d['visits']} visits, {settled:.1f} settledness, {oppsettled:.1f} opponent settledness{', attachment' if isattach else ''}{', tenuki' if istenuki else ''})"
+			f"{move} ({d['pointsLost']:.1f} pt lost, {d['visits']} visits, {settled:.1f} settledness, "
+			f"{oppsettled:.1f} opponent settledness{', attachment' if isattach else ''}"
+			f"{', tenuki' if istenuki else ''})"
 			for move, settled, oppsettled, isattach, istenuki, d in moves_with_settledness[:5]
 		]
 		ai_thoughts = f"top 5 candidates {', '.join(cands)} "
