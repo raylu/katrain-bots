@@ -11,3 +11,6 @@ inline-quotes = 'single'
 multiline-quotes = 'double'
 [tool.ruff.isort]
 lines-after-imports = 1
+
+[tool.mypy]
+ignore_missing_imports = true

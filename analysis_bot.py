@@ -9,8 +9,8 @@ import sys
 import traceback
 from typing import Any, Literal, Union
 
-import sgfmill.ascii_boards  # type: ignore[import]
-import sgfmill.boards  # type: ignore[import]
+import sgfmill.ascii_boards
+import sgfmill.boards
 
 Color = Union[Literal['b'], Literal['w']]
 Move = Union[Literal['pass'], tuple[int, int]]
