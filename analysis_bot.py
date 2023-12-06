@@ -52,11 +52,6 @@ class KataGo:
 		}
 		self.query_counter += 1
 
-		# for y in range(initial_board.side):
-		# 	for x in range(initial_board.side):
-		# 		color = initial_board.get(y, x)
-		# 		if color:
-		# 			query['initialStones'].append((color, sgfmill_to_str((y, x))))
 		if max_visits is not None:
 			query['maxVisits'] = max_visits
 		return self.query_raw(query)
@@ -92,9 +87,9 @@ class GTPEngine:
 			'boardsize': self.boardsize,
 			'komi': self.set_komi,
 			'set_free_handicap': self.set_free_handicap,
+			'place_free_handicap': self.place_free_handicap,
 			'play': self.play,
 			'genmove': self.genmove,
-			# TODO: place_free_handicap
 		}
 		self.size = 19
 		self.komi = 7.5
@@ -139,13 +134,25 @@ class GTPEngine:
 		return ''
 
 	def set_free_handicap(self, args: str) -> str:
-		self.next_player = 'w'
+		"""opponent sets handicap stones"""
 		for stone in args.split():
 			stone = stone.upper()
 			coords = str_to_sgfmill(stone)
 			self.handicap_stones.append(('b', stone))
 			self.board.play(*coords, 'b')
+		self.next_player = 'w'
 		return ''
+
+	def place_free_handicap(self, args: str) -> str:
+		"""bot sets handicap stones"""
+		num_stones = int(args)
+		stones = ['D4', 'Q16', 'D16', 'Q4', 'D10', 'Q10', 'K4', 'K16', 'K10'][:num_stones]
+		for stone in stones:
+			coords = str_to_sgfmill(stone)
+			self.handicap_stones.append(('b', stone))
+			self.board.play(*coords, 'b')
+		self.next_player = 'w'
+		return ' '.join(stones)
 
 	def play(self, args: str) -> str:
 		player, move = args.split()
@@ -185,7 +192,7 @@ class GTPEngine:
 			self.moves.append((self.next_player, ai_move))
 			ai_move_coords = str_to_sgfmill(ai_move)
 			self.board.play(*ai_move_coords, self.next_player)
-		print(sgfmill.ascii_boards.render_board(self.board), file=sys.stderr)
+		# print(sgfmill.ascii_boards.render_board(self.board), file=sys.stderr)
 		self.next_player = opponent
 		return ai_move
 
