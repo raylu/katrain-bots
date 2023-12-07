@@ -294,7 +294,10 @@ class GTPEngine:
 		if 'pv' in move_d and move_d['pointsLost'] > 2.0:
 			print(f"DISCUSSION:{ai_move} causes me to lose {move_d['pointsLost']:.1f} points",
 					file=sys.stderr)
-			print(f"MALKOVICH:Visits {move_d['visits']} Winrate {move_d['winrate']:.2f}% "
+			winrate = move_d['winrate'] * 100
+			if self.next_player == 'w':
+				winrate = 100 - winrate # reportAnalysisWinratesAs = BLACK
+			print(f"MALKOVICH:Visits {move_d['visits']} Winrate {winrate:.2f}% "
 					f"ScoreLead {move_d['scoreLead'] * sign:.1f} ScoreStdev {move_d['scoreStdev']:.1f} "
 					f"PV {' '.join(move_d['pv'])}", file=sys.stderr)
 
