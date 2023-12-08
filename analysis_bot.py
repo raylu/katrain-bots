@@ -46,7 +46,7 @@ class KataGo:
 			'id': str(self.query_counter),
 			'moves': moves,
 			'initialStones': handicap_stones,
-			'rules': 'Chinese',
+			'rules': 'chinese-ogs',
 			'komi': komi,
 			'boardXSize': size,
 			'boardYSize': size,
