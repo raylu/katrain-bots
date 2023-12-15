@@ -161,7 +161,11 @@ class GTPEngine:
 	def place_free_handicap(self, args: str) -> str:
 		"""bot sets handicap stones"""
 		num_stones = int(args)
-		stones = ['D4', 'Q16', 'D16', 'Q4', 'D10', 'Q10', 'K4', 'K16', 'K10'][:num_stones]
+		handi_locations = ['D4', 'Q16', 'D16', 'Q4', 'D10', 'Q10', 'K4', 'K16', 'K10']
+		if self.size != 19 or num_stones > len(handi_locations):
+			self.log(f"can't place {num_stones} on {self.size} board")
+			return 'pass' # gtp2ogs will resign
+		stones = handi_locations[:num_stones]
 		for stone in stones:
 			coords = str_to_sgfmill(stone)
 			self.handicap_stones.append(('b', stone))
