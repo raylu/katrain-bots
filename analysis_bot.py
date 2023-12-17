@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import argparse
 import datetime
 import json
 import pathlib
@@ -16,17 +15,21 @@ Color = Literal['b'] | Literal['w']
 Move = Literal['pass'] | tuple[int, int]
 COLS = 'ABCDEFGHJKLMNOPQRSTUVWXYZ'
 
-MAX_POINTS_LOST = 7.5
-SETTLED_WEIGHT = 1.0
-MIN_VISITS = 1
-ATTACH_PENALTY = 1.0
-TENUKI_PENALTY = 0.5
-OPPONENT_FAC = 0.5
-
 def main():
-	katago = args_to_katago()
+	mode = sys.argv[1]
+	assert mode in ['simple', 'tenuki']
+
+	katago = KataGo(katago_path='/home/raylu/katago/katago', config_path='katago_analysis.cfg',
+			model_path='/home/raylu/katago/default_model.bin.gz')
+	gtp_engine = GTPEngine(katago)
+
+	if mode == 'tenuki':
+		gtp_engine.SETTLED_WEIGHT = -gtp_engine.SETTLED_WEIGHT
+		gtp_engine.ATTACH_PENALTY = -gtp_engine.ATTACH_PENALTY
+		gtp_engine.TENUKI_PENALTY = -gtp_engine.TENUKI_PENALTY
+
 	try:
-		GTPEngine(katago).run()
+		gtp_engine.run()
 	finally:
 		katago.close()
 
@@ -70,19 +73,14 @@ class KataGo:
 			if line != '':
 				return json.loads(line.decode())
 
-def args_to_katago() -> KataGo:
-	description = """run KataGo analysis engine as a GTP bot"""
-	parser = argparse.ArgumentParser(description=description)
-	parser.add_argument('--katago-path', help='Path to katago executable', required=True)
-	parser.add_argument('--config-path',
-			help='Path to KataGo analysis config (e.g. cpp/configs/analysis_example.cfg in KataGo repo)',
-			required=True)
-	parser.add_argument('--model-path', help='Path to neural network .bin.gz file', required=True)
-	args = vars(parser.parse_args())
-
-	return KataGo(args['katago_path'], args['config_path'], args['model_path'])
-
 class GTPEngine:
+	MAX_POINTS_LOST = 7.5
+	SETTLED_WEIGHT = 1.0
+	MIN_VISITS = 1
+	ATTACH_PENALTY = 1.0
+	TENUKI_PENALTY = 0.5
+	OPPONENT_FAC = 0.5
+
 	def __init__(self, katago: KataGo, log_file: TextIO | None=None) -> None:
 		self.katago = katago
 		self.commands = {
@@ -278,16 +276,16 @@ class GTPEngine:
 		moves_with_settledness = [
 			(d['move'], settledness(d, sign), settledness(d, -sign), is_attachment(d['move']), is_tenuki(d['move']), d)
 			for d in candidate_ai_moves
-			if d['pointsLost'] < MAX_POINTS_LOST
+			if d['pointsLost'] < self.MAX_POINTS_LOST
 			and 'ownership' in d
-			and (d['order'] <= 1 or d['visits'] >= MIN_VISITS)
+			and (d['order'] <= 1 or d['visits'] >= self.MIN_VISITS)
 			and (d['move'] != 'pass' or d['pointsLost'] < 0.75)
 		]
 		moves_with_settledness.sort(
 			key=lambda t: t[5]['pointsLost']
-			+ ATTACH_PENALTY * t[3]
-			+ TENUKI_PENALTY * t[4]
-			- SETTLED_WEIGHT * (t[1] + OPPONENT_FAC * t[2]),
+			+ self.ATTACH_PENALTY * t[3]
+			+ self.TENUKI_PENALTY * t[4]
+			- self.SETTLED_WEIGHT * (t[1] + self.OPPONENT_FAC * t[2]),
 		)
 		if not moves_with_settledness:
 			raise Exception('No moves found - are you using an older KataGo with no per-move ownership info?')
