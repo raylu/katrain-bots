@@ -7,13 +7,13 @@ import pathlib
 import subprocess
 import sys
 import traceback
-from typing import Any, Literal, TextIO, Union
+from typing import Any, Literal, TextIO
 
 import sgfmill.ascii_boards
 import sgfmill.boards
 
-Color = Union[Literal['b'], Literal['w']]
-Move = Union[Literal['pass'], tuple[int, int]]
+Color = Literal['b'] | Literal['w']
+Move = Literal['pass'] | tuple[int, int]
 COLS = 'ABCDEFGHJKLMNOPQRSTUVWXYZ'
 
 MAX_POINTS_LOST = 7.5
@@ -109,7 +109,6 @@ class GTPEngine:
 		else:
 			self.log_file = log_file
 			
-
 	def run(self) -> None:
 		while True:
 			try:
