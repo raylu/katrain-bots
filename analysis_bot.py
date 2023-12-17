@@ -16,7 +16,7 @@ Color = Union[Literal['b'], Literal['w']]
 Move = Union[Literal['pass'], tuple[int, int]]
 COLS = 'ABCDEFGHJKLMNOPQRSTUVWXYZ'
 
-MAX_POINTS_LOST = 5.0
+MAX_POINTS_LOST = 7.5
 SETTLED_WEIGHT = 1.0
 MIN_VISITS = 1
 ATTACH_PENALTY = 1.0
