@@ -204,7 +204,7 @@ class GTPEngine:
 		else:
 			ai_move = self.query_ai_move(opponent)
 
-		if ai_move == 'pass':
+		if ai_move in ('pass', 'resign'):
 			self.moves.append((self.next_player, 'pass'))
 		else:
 			self.moves.append((self.next_player, ai_move))
@@ -218,18 +218,24 @@ class GTPEngine:
 	def query_ai_move(self, opponent: Color) -> str:
 		sign = {'b': 1, 'w': -1}[self.next_player]
 		analysis = self.katago.query(self.size, self.moves, self.handicap_stones, self.komi, max_visits=100)
-		assert analysis['rootInfo']['currentPlayer'] == self.next_player.upper()
-		candidate_ai_moves = candidate_moves(analysis, sign)
+		root_info: dict = analysis['rootInfo']
+		assert root_info['currentPlayer'] == self.next_player.upper()
+
+		if root_info['rawVarTimeLeft'] < 0.01 and \
+				(self.next_player == 'b' and root_info['scoreLead'] < 40.0 and root_info['winrate'] < 0.03) or \
+				(self.next_player == 'w' and root_info['scoreLead'] > 40.0 and root_info['winrate'] > 0.97):
+			return 'resign'
 
 		if self.score_lead is not None:
-			current_lead = analysis['rootInfo']['scoreLead']
+			current_lead = root_info['scoreLead']
 			score_delta = abs(current_lead - self.score_lead)
 			if score_delta > 2.0:
 				last_move = self.moves[-1][1]
 				print(f'MALKOVICH:{last_move} caused a significant score change: {score_delta:.1f} points.',
 						f'score lead: {current_lead:.1f}', file=sys.stderr)
-		self.score_lead = analysis['rootInfo']['scoreLead']
+		self.score_lead = root_info['scoreLead']
 
+		candidate_ai_moves = candidate_moves(analysis, sign)
 		if candidate_ai_moves[0]['move'] == 'pass':
 			return 'pass'
 
