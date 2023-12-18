@@ -232,7 +232,7 @@ class GTPEngine:
 			if score_delta > 2.0:
 				last_move = self.moves[-1][1]
 				print(f'MALKOVICH:{last_move} caused a significant score change: {score_delta:.1f} points.',
-						f'score lead: {current_lead:.1f}', file=sys.stderr)
+						f'score lead for black: {current_lead:.1f}', file=sys.stderr)
 		self.score_lead = root_info['scoreLead']
 
 		candidate_ai_moves = candidate_moves(analysis, sign)
