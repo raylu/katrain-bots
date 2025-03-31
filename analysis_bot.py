@@ -25,8 +25,8 @@ def main():
 
 	if mode == 'tenuki':
 		gtp_engine.SETTLED_WEIGHT = -gtp_engine.SETTLED_WEIGHT
-		gtp_engine.ATTACH_PENALTY = -gtp_engine.ATTACH_PENALTY
-		gtp_engine.TENUKI_PENALTY = -gtp_engine.TENUKI_PENALTY
+		gtp_engine.ATTACH_PENALTY = -0.1
+		gtp_engine.TENUKI_PENALTY = -1.0
 
 	try:
 		gtp_engine.run()
