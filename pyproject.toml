@@ -1,3 +1,10 @@
+[project]
+name = 'katrain-bots'
+version = '0'
+dependencies = [
+	"sgfmill",
+]
+
 [tool.ruff]
 line-length = 120
 select = [
