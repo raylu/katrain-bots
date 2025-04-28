@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 
-import datetime
 import json
-import pathlib
 import subprocess
 import sys
-import traceback
-from typing import Any, Literal, TextIO
+from typing import Any, Literal
 
 import sgfmill.ascii_boards
 import sgfmill.boards
@@ -17,16 +14,21 @@ COLS = 'ABCDEFGHJKLMNOPQRSTUVWXYZ'
 
 def main():
 	mode = sys.argv[1]
-	assert mode in ['simple', 'tenuki']
+	assert mode in ['simple', 'tenuki', 'unusual']
 
+	human_model = None
+	if mode == 'unusual':
+		human_model = '/home/raylu/katago/b18c384nbt-humanv0.bin.gz'
 	katago = KataGo(katago_path='/home/raylu/katago/katago', config_path='katago_analysis.cfg',
-			model_path='/home/raylu/katago/default_model.bin.gz')
-	gtp_engine = GTPEngine(katago)
+			model_path='/home/raylu/katago/default_model.bin.gz', human_model=human_model)
+	gtp_engine = GTPEngine(katago, unusual_mode=(mode == 'unusual'))
 
 	if mode == 'tenuki':
 		gtp_engine.SETTLED_WEIGHT = -gtp_engine.SETTLED_WEIGHT
 		gtp_engine.ATTACH_PENALTY = -0.1
 		gtp_engine.TENUKI_PENALTY = -1.0
+	elif mode == 'tenuki':
+		gtp_engine.MAX_POINTS_LOST = 1.25
 
 	try:
 		gtp_engine.run()
@@ -34,17 +36,18 @@ def main():
 		katago.close()
 
 class KataGo:
-	def __init__(self, katago_path: str, config_path: str, model_path: str, additional_args: list[str] = []):
+	def __init__(self, katago_path: str, config_path: str, model_path: str, human_model: str | None):
+		args = [katago_path, 'analysis', '-config', config_path, '-model', model_path]
+		if human_model is not None:
+			args.extend(['-human-model', '/home/raylu/katago/b18c384nbt-humanv0.bin.gz'])
+		self.katago = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 		self.query_counter = 0
-		self.katago = subprocess.Popen(
-				[katago_path, 'analysis', '-config', config_path, '-model', model_path, *additional_args],
-				stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
 	def close(self):
 		self.katago.stdin.close() # type: ignore[reportOptionalMemberAccess]
 
 	def query(self, size: int, moves: list[tuple[Color, str]], handicap_stones: list[tuple[Color, str]],
-			komi: float, max_visits: int | None=None):
+			komi: float, max_visits: int | None=None, include_ownership: bool=False, human_profile: str | None=None):
 		query = {
 			'id': str(self.query_counter),
 			'moves': moves,
@@ -53,12 +56,15 @@ class KataGo:
 			'komi': komi,
 			'boardXSize': size,
 			'boardYSize': size,
-			'includeMovesOwnership': True,
+			'includeMovesOwnership': include_ownership,
 		}
 		self.query_counter += 1
 
 		if max_visits is not None:
 			query['maxVisits'] = max_visits
+		if human_profile is not None:
+			query['overrideSettings'] = {'humanSLProfile': human_profile}
+			query['includePolicy'] = True
 		return self.query_raw(query)
 
 	def query_raw(self, query: dict[str, Any]):
@@ -81,7 +87,7 @@ class GTPEngine:
 	TENUKI_PENALTY = 0.5
 	OPPONENT_FAC = 0.5
 
-	def __init__(self, katago: KataGo, log_file: TextIO | None=None) -> None:
+	def __init__(self, katago: KataGo, *, unusual_mode: bool) -> None:
 		self.katago = katago
 		self.commands = {
 			'list_commands': self.list_commands,
@@ -100,12 +106,7 @@ class GTPEngine:
 		self.next_player: Color = 'b'
 		self.score_lead = None
 		self.consecutive_passes = 0
-		if log_file is None:
-			log_path = pathlib.Path('logs', datetime.datetime.now().isoformat())
-			log_path.parent.mkdir(exist_ok=True)
-			self.log_file: TextIO = log_path.open('x', buffering=1)
-		else:
-			self.log_file = log_file
+		self.unusual_mode = unusual_mode
 			
 	def run(self) -> None:
 		while True:
@@ -123,14 +124,9 @@ class GTPEngine:
 				args = ''
 				if len(split) == 2:
 					args = split[1]
-				try:
-					response = handler(args)
-				except Exception:
-					self.log(traceback.format_exc())
-					raise
+				response = handler(args)
 			print(f'= {response}\n')
 			sys.stdout.flush()
-		self.log_file.close()
 
 	def list_commands(self, args: str) -> str:
 		return '\n'.join(self.commands.keys())
@@ -160,7 +156,6 @@ class GTPEngine:
 		num_stones = int(args)
 		handi_locations = ['D4', 'Q16', 'D16', 'Q4', 'D10', 'Q10', 'K4', 'K16', 'K10']
 		if self.size != 19 or num_stones > len(handi_locations):
-			self.log(f"can't place {num_stones} on {self.size} board")
 			return 'pass' # gtp2ogs will resign
 		stones = handi_locations[:num_stones]
 		for stone in stones:
@@ -182,7 +177,6 @@ class GTPEngine:
 			coords = str_to_sgfmill(move)
 			self.board.play(*coords, args[0])
 			self.consecutive_passes = 0
-		self.log('opponent played', move)
 
 		if args[0] == 'b':
 			self.next_player = 'w'
@@ -201,6 +195,8 @@ class GTPEngine:
 			print(f'DISCUSSION:since you passed 3 times after move {2 * self.size}, I will pass as well',
 				file=sys.stderr)
 			ai_move = 'pass'
+		elif self.unusual_mode:
+			ai_move = self.query_unusual_move(opponent)
 		else:
 			ai_move = self.query_ai_move(opponent)
 
@@ -212,18 +208,16 @@ class GTPEngine:
 			self.board.play(*ai_move_coords, self.next_player)
 		# print(sgfmill.ascii_boards.render_board(self.board), file=sys.stderr)
 		self.next_player = opponent
-		self.log('playing', ai_move)
 		return ai_move
 
 	def query_ai_move(self, opponent: Color) -> str:
 		sign = {'b': 1, 'w': -1}[self.next_player]
-		analysis = self.katago.query(self.size, self.moves, self.handicap_stones, self.komi, max_visits=100)
+		analysis = self.katago.query(self.size, self.moves, self.handicap_stones, self.komi, max_visits=100,
+				include_ownership=True)
 		root_info: dict = analysis['rootInfo']
 		assert root_info['currentPlayer'] == self.next_player.upper()
 
-		if (root_info['rawVarTimeLeft'] < 0.01 and \
-				(self.next_player == 'b' and root_info['scoreLead'] < 40.0 and root_info['winrate'] < 0.03)) or \
-				(self.next_player == 'w' and root_info['scoreLead'] > 40.0 and root_info['winrate'] > 0.97):
+		if self.should_resign(root_info):
 			return 'resign'
 
 		if self.score_lead is not None:
@@ -308,18 +302,39 @@ class GTPEngine:
 					f"ScoreLead {move_d['scoreLead'] * sign:.1f} ScoreStdev {move_d['scoreStdev']:.1f} "
 					f"PV {' '.join(move_d['pv'])}", file=sys.stderr)
 
-		cands = [
-			f"{move} ({d['pointsLost']:.1f} pt lost, {d['visits']} visits, {settled:.1f} settledness, "
-			f"{oppsettled:.1f} opponent settledness{', attachment' if isattach else ''}"
-			f"{', tenuki' if istenuki else ''})"
-			for move, settled, oppsettled, isattach, istenuki, d in moves_with_settledness[:5]
-		]
-		ai_thoughts = f"top 5 candidates {', '.join(cands)} "
-		self.log(ai_thoughts)
 		return ai_move
 
-	def log(self, *msg: Any) -> None:
-		self.log_file.write(f'[{len(self.moves)}] {" ".join(map(str, msg))}\n')
+	def query_unusual_move(self, opponent: Color) -> str:
+		sign = {'b': 1, 'w': -1}[self.next_player]
+		analysis = self.katago.query(self.size, self.moves, self.handicap_stones, self.komi, max_visits=100,
+				human_profile='rank_9d')
+		root_info: dict = analysis['rootInfo']
+		assert root_info['currentPlayer'] == self.next_player.upper()
+
+		if self.should_resign(root_info):
+			return 'resign'
+
+		candidate_ai_moves = candidate_moves(analysis, sign)
+		if candidate_ai_moves[0]['move'] == 'pass':
+			return 'pass'
+		ai_move = None
+		min_policy = 1.0
+		for d in candidate_ai_moves:
+			if d['move'] != 'pass' and d['pointsLost'] < self.MAX_POINTS_LOST:
+				policy_index = COLS.index(d['move'][0]) * self.size + self.size - int(d['move'][1:])
+				policy = analysis['humanPolicy'][policy_index]
+				if policy < min_policy:
+					min_policy = policy
+					ai_move = d['move']
+
+		assert ai_move is not None
+		return ai_move
+
+	def should_resign(self, root_info: dict) -> bool:
+		return (root_info['rawVarTimeLeft'] < 0.01 and \
+			(self.next_player == 'b' and root_info['scoreLead'] < 40.0 and root_info['winrate'] < 0.03)) or \
+			(self.next_player == 'w' and root_info['scoreLead'] > 40.0 and root_info['winrate'] > 0.97)
+
 
 def sgfmill_to_str(move: Move) -> str:
 	if move == 'pass':
