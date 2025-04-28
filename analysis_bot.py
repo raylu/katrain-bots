@@ -41,7 +41,7 @@ class KataGo:
 				stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
 	def close(self):
-		self.katago.stdin.close()
+		self.katago.stdin.close() # type: ignore[reportOptionalMemberAccess]
 
 	def query(self, size: int, moves: list[tuple[Color, str]], handicap_stones: list[tuple[Color, str]],
 			komi: float, max_visits: int | None=None):
@@ -221,8 +221,8 @@ class GTPEngine:
 		root_info: dict = analysis['rootInfo']
 		assert root_info['currentPlayer'] == self.next_player.upper()
 
-		if root_info['rawVarTimeLeft'] < 0.01 and \
-				(self.next_player == 'b' and root_info['scoreLead'] < 40.0 and root_info['winrate'] < 0.03) or \
+		if (root_info['rawVarTimeLeft'] < 0.01 and \
+				(self.next_player == 'b' and root_info['scoreLead'] < 40.0 and root_info['winrate'] < 0.03)) or \
 				(self.next_player == 'w' and root_info['scoreLead'] > 40.0 and root_info['winrate'] > 0.97):
 			return 'resign'
 
