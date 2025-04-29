@@ -19,7 +19,8 @@ def main() -> None:
 	assert game['height'] == game['width']
 
 	katago = analysis_bot.KataGo('/home/raylu/katago/katago', 'katago_analysis.cfg',
-			'/home/raylu/katago/default_model.bin.gz')
+			'/home/raylu/katago/default_model.bin.gz',
+			human_model='/home/raylu/katago/b18c384nbt-humanv0.bin.gz')
 	try:
 		analyze(katago, game, move_num)
 	finally:
@@ -28,8 +29,9 @@ def main() -> None:
 def analyze(katago: analysis_bot.KataGo, game: dict, move_num: int) -> None:
 	print(f"{game['players']['black']['username']} vs {game['players']['white']['username']}")
 
-	engine = analysis_bot.GTPEngine(katago, sys.stdout)
+	engine = analysis_bot.GTPEngine(katago, drunk_mode=True)
 	size = game['height']
+	engine.boardsize(size)
 	next_player: Color = 'black'
 	moves: list[list[int]] = game['gamedata']['moves']
 
@@ -47,6 +49,7 @@ def analyze(katago: analysis_bot.KataGo, game: dict, move_num: int) -> None:
 			next_player = 'black'
 	print(sgfmill.ascii_boards.render_board(engine.board))
 
+	print('generating move for', next_player)
 	engine.genmove(next_player)
 
 def place(engine: analysis_bot.GTPEngine, size: int, move: list[int], player: Color) -> None:

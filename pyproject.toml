@@ -2,6 +2,7 @@
 name = 'katrain-bots'
 version = '0'
 dependencies = [
+	"httpx",
 	"sgfmill",
 ]
 
