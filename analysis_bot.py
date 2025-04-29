@@ -321,7 +321,7 @@ class GTPEngine:
 		min_policy = 1.0
 		for d in candidate_ai_moves:
 			if d['move'] != 'pass' and d['pointsLost'] < self.MAX_POINTS_LOST:
-				policy_index = COLS.index(d['move'][0]) * self.size + self.size - int(d['move'][1:])
+				policy_index = (self.size - int(d['move'][1:])) * self.size + COLS.index(d['move'][0])
 				policy = analysis['humanPolicy'][policy_index]
 				if policy < min_policy:
 					min_policy = policy
