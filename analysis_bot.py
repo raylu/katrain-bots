@@ -337,7 +337,7 @@ class GTPEngine:
 
 	def should_resign(self, root_info: dict) -> bool:
 		return (root_info['rawVarTimeLeft'] < 0.01 and \
-			(self.next_player == 'b' and root_info['scoreLead'] < 40.0 and root_info['winrate'] < 0.03)) or \
+			(self.next_player == 'b' and root_info['scoreLead'] < -40.0 and root_info['winrate'] < 0.03)) or \
 			(self.next_player == 'w' and root_info['scoreLead'] > 40.0 and root_info['winrate'] > 0.97)
 
 def sgfmill_to_str(move: Move) -> str:
