@@ -14,14 +14,14 @@ COLS = 'ABCDEFGHJKLMNOPQRSTUVWXYZ'
 
 def main():
 	mode = sys.argv[1]
-	assert mode in ['simple', 'tenuki', 'unusual']
+	assert mode in ['simple', 'tenuki', 'drunk']
 
 	human_model = None
-	if mode == 'unusual':
+	if mode == 'drunk':
 		human_model = '/home/raylu/katago/b18c384nbt-humanv0.bin.gz'
 	katago = KataGo(katago_path='/home/raylu/katago/katago', config_path='katago_analysis.cfg',
 			model_path='/home/raylu/katago/default_model.bin.gz', human_model=human_model)
-	gtp_engine = GTPEngine(katago, unusual_mode=(mode == 'unusual'))
+	gtp_engine = GTPEngine(katago, drunk_mode=(mode == 'drunk'))
 
 	if mode == 'tenuki':
 		gtp_engine.SETTLED_WEIGHT = -gtp_engine.SETTLED_WEIGHT
@@ -87,7 +87,7 @@ class GTPEngine:
 	TENUKI_PENALTY = 0.5
 	OPPONENT_FAC = 0.5
 
-	def __init__(self, katago: KataGo, *, unusual_mode: bool) -> None:
+	def __init__(self, katago: KataGo, *, drunk_mode: bool) -> None:
 		self.katago = katago
 		self.commands = {
 			'list_commands': self.list_commands,
@@ -106,7 +106,7 @@ class GTPEngine:
 		self.next_player: Color = 'b'
 		self.score_lead = None
 		self.consecutive_passes = 0
-		self.unusual_mode = unusual_mode
+		self.drunk_mode = drunk_mode
 			
 	def run(self) -> None:
 		while True:
@@ -195,8 +195,8 @@ class GTPEngine:
 			print(f'DISCUSSION:since you passed 3 times after move {2 * self.size}, I will pass as well',
 				file=sys.stderr)
 			ai_move = 'pass'
-		elif self.unusual_mode:
-			ai_move = self.query_unusual_move(opponent)
+		elif self.drunk_mode:
+			ai_move = self.query_drunk_move(opponent)
 		else:
 			ai_move = self.query_ai_move(opponent)
 
@@ -304,7 +304,7 @@ class GTPEngine:
 
 		return ai_move
 
-	def query_unusual_move(self, opponent: Color) -> str:
+	def query_drunk_move(self, opponent: Color) -> str:
 		sign = {'b': 1, 'w': -1}[self.next_player]
 		analysis = self.katago.query(self.size, self.moves, self.handicap_stones, self.komi, max_visits=100,
 				human_profile='rank_9d')
