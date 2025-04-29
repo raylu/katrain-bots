@@ -1,4 +1,4 @@
 /.venv/
 /__pycache__/
-/gtp2ogs.json5
+/*.json5
 /logs/
