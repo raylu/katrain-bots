@@ -57,13 +57,14 @@ class KataGo:
 			'boardXSize': size,
 			'boardYSize': size,
 			'includeMovesOwnership': include_ownership,
+			'overrideSettings': {'wideRootNoise': 1.0},
 		}
 		self.query_counter += 1
 
 		if max_visits is not None:
 			query['maxVisits'] = max_visits
 		if human_profile is not None:
-			query['overrideSettings'] = {'humanSLProfile': human_profile}
+			query['overrideSettings']['humanSLProfile'] = human_profile
 			query['includePolicy'] = True
 		return self.query_raw(query)
 
