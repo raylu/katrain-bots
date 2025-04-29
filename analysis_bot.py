@@ -27,7 +27,7 @@ def main():
 		gtp_engine.SETTLED_WEIGHT = -gtp_engine.SETTLED_WEIGHT
 		gtp_engine.ATTACH_PENALTY = -0.1
 		gtp_engine.TENUKI_PENALTY = -1.0
-	elif mode == 'tenuki':
+	elif mode == 'drunk':
 		gtp_engine.MAX_POINTS_LOST = 1.25
 
 	try:
