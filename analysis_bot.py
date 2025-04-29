@@ -65,7 +65,6 @@ class KataGo:
 			query['maxVisits'] = max_visits
 		if human_profile is not None:
 			query['overrideSettings']['humanSLProfile'] = human_profile
-			query['includePolicy'] = True
 		return self.query_raw(query)
 
 	def query_raw(self, query: dict[str, Any]):
@@ -318,24 +317,28 @@ class GTPEngine:
 		candidate_ai_moves = candidate_moves(analysis, sign)
 		if candidate_ai_moves[0]['move'] == 'pass':
 			return 'pass'
-		ai_move = None
+		ai_move = points_lost = None
 		min_policy = 1.0
 		for d in candidate_ai_moves:
-			if d['move'] != 'pass' and d['pointsLost'] < self.MAX_POINTS_LOST:
-				policy_index = (self.size - int(d['move'][1:])) * self.size + COLS.index(d['move'][0])
-				policy = analysis['humanPolicy'][policy_index]
-				if policy < min_policy:
-					min_policy = policy
-					ai_move = d['move']
+			if d['move'] == 'pass':
+				continue
+			if d['pointsLost'] > self.MAX_POINTS_LOST:
+				break
+			policy = d['humanPrior']
+			if policy < min_policy:
+				min_policy = policy
+				ai_move = d['move']
+				points_lost = d['pointsLost']
+		assert ai_move is not None and points_lost is not None
+		if points_lost >= 1.0:
+			print(f'DISCUSSION:{ai_move} causes me to lose {points_lost:.1f} points', file=sys.stderr)
 
-		assert ai_move is not None
 		return ai_move
 
 	def should_resign(self, root_info: dict) -> bool:
 		return (root_info['rawVarTimeLeft'] < 0.01 and \
 			(self.next_player == 'b' and root_info['scoreLead'] < 40.0 and root_info['winrate'] < 0.03)) or \
 			(self.next_player == 'w' and root_info['scoreLead'] > 40.0 and root_info['winrate'] > 0.97)
-
 
 def sgfmill_to_str(move: Move) -> str:
 	if move == 'pass':
