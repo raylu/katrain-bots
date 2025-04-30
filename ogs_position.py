@@ -65,7 +65,7 @@ def render_board(board: sgfmill.boards.Board) -> None:
 		print(analysis_bot.COLS[col], end=' ')
 	print('\n', end='')
 	for row in range(board.side - 1, -1, -1):
-		print(row + 1, end=' \x1B[48;5;94m')
+		print(f'{row + 1:2d}', end='\x1B[48;5;94m')
 		for col in range(board.side):
 			color = board.get(row, col)
 			if color == 'b':
@@ -73,7 +73,7 @@ def render_board(board: sgfmill.boards.Board) -> None:
 			elif color == 'w':
 				print('⚪', end='')
 			else:
-				print('  ', end='')
+				print('✛ ', end='')
 		print('\x1B[0m')
 
 if __name__ == '__main__':
