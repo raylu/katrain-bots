@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import json
+import random
 import subprocess
 import sys
 from typing import Any, Literal
@@ -317,23 +318,20 @@ class GTPEngine:
 		candidate_ai_moves = candidate_moves(analysis, sign)
 		if candidate_ai_moves[0]['move'] == 'pass':
 			return 'pass'
-		ai_move = points_lost = None
-		min_policy = 1.0
+		allowed_moves = []
+		weights = []
 		for d in candidate_ai_moves:
 			if d['move'] == 'pass':
 				continue
 			if d['pointsLost'] > self.MAX_POINTS_LOST:
 				break
 			policy = d['humanPrior']
-			if policy < min_policy:
-				min_policy = policy
-				ai_move = d['move']
-				points_lost = d['pointsLost']
-		assert ai_move is not None and points_lost is not None
-		if points_lost >= 1.0:
-			print(f'DISCUSSION:{ai_move} causes me to lose {points_lost:.1f} points', file=sys.stderr)
-
-		return ai_move
+			allowed_moves.append(d)
+			weights.append(1 / policy)
+		(move,) = random.choices(allowed_moves, weights)
+		if move['pointsLost'] >= 1.0:
+			print(f"DISCUSSION:{move['move']} causes me to lose {move['pointsLost']:.1f} points", file=sys.stderr)
+		return move['move']
 
 	def should_resign(self, root_info: dict) -> bool:
 		return (root_info['rawVarTimeLeft'] < 0.01 and \
