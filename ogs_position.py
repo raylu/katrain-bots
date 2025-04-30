@@ -4,7 +4,7 @@ import sys
 from typing import Literal
 
 import httpx
-import sgfmill.ascii_boards
+import sgfmill.boards
 
 import analysis_bot
 
@@ -47,10 +47,10 @@ def analyze(katago: analysis_bot.KataGo, game: dict, move_num: int) -> None:
 			next_player = 'white'
 		else:
 			next_player = 'black'
-	print(sgfmill.ascii_boards.render_board(engine.board))
+	render_board(engine.board)
 
 	print('generating move for', next_player)
-	engine.genmove(next_player)
+	print(engine.genmove(next_player))
 
 def place(engine: analysis_bot.GTPEngine, size: int, move: list[int], player: Color) -> None:
 	y, x, _ = move
@@ -58,6 +58,23 @@ def place(engine: analysis_bot.GTPEngine, size: int, move: list[int], player: Co
 		engine.play(f'{player} pass')
 	else:
 		engine.play(f'{player} {analysis_bot.sgfmill_to_str((size - x - 1, y))}')
+
+def render_board(board: sgfmill.boards.Board) -> None:
+	print('  ', end='')
+	for col in range(board.side):
+		print(analysis_bot.COLS[col], end=' ')
+	print('\n', end='')
+	for row in range(board.side - 1, -1, -1):
+		print(row + 1, end=' \x1B[48;5;94m')
+		for col in range(board.side):
+			color = board.get(row, col)
+			if color == 'b':
+				print('⚫', end='')
+			elif color == 'w':
+				print('⚪', end='')
+			else:
+				print('  ', end='')
+		print('\x1B[0m')
 
 if __name__ == '__main__':
 	main()
