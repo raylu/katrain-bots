@@ -316,12 +316,12 @@ class GTPEngine:
 			return 'resign'
 
 		candidate_ai_moves = candidate_moves(analysis, sign)
-		if candidate_ai_moves[0]['move'] == 'pass':
-			return 'pass'
 		allowed_moves = []
 		weights = []
 		for d in candidate_ai_moves:
 			if d['move'] == 'pass':
+				if d['order'] == 0 or (root_info['rawVarTimeLeft'] < 0.001 and d['pointsLost'] < 0.05):
+					return 'pass'
 				continue
 			if d['pointsLost'] > self.MAX_POINTS_LOST:
 				break
