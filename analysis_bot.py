@@ -329,7 +329,7 @@ class GTPEngine:
 			allowed_moves.append(d)
 			weights.append(1 / policy)
 		(move,) = random.choices(allowed_moves, weights)
-		if move['pointsLost'] >= 1.0:
+		if move['pointsLost'] > self.MAX_POINTS_LOST / 2:
 			print(f"DISCUSSION:{move['move']} causes me to lose {move['pointsLost']:.1f} points", file=sys.stderr)
 		return move['move']
 
