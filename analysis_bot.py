@@ -320,7 +320,8 @@ class GTPEngine:
 		weights = []
 		for d in candidate_ai_moves:
 			if d['move'] == 'pass':
-				if d['order'] == 0 or (root_info['rawVarTimeLeft'] < 0.001 and d['pointsLost'] < 0.05):
+				if d['order'] == 0 or \
+						(root_info['rawVarTimeLeft'] < 0.002 and d['order'] < 5 and d['pointsLost'] < 0.2):
 					return 'pass'
 				continue
 			if d['pointsLost'] > self.MAX_POINTS_LOST:
