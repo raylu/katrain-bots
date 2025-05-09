@@ -58,7 +58,7 @@ class KataGo:
 			'boardXSize': size,
 			'boardYSize': size,
 			'includeMovesOwnership': include_ownership,
-			'overrideSettings': {'wideRootNoise': 1.0},
+			'overrideSettings': {'wideRootNoise': 0.99},
 		}
 		self.query_counter += 1
 
@@ -192,11 +192,7 @@ class GTPEngine:
 		else:
 			opponent = 'b'
 
-		if self.consecutive_passes >= 3 and len(self.moves) > 2 * self.size:
-			print(f'DISCUSSION:since you passed 3 times after move {2 * self.size}, I will pass as well',
-				file=sys.stderr)
-			ai_move = 'pass'
-		elif self.drunk_mode:
+		if self.drunk_mode:
 			ai_move = self.query_drunk_move(opponent)
 		else:
 			ai_move = self.query_ai_move(opponent)
@@ -232,6 +228,8 @@ class GTPEngine:
 
 		candidate_ai_moves = candidate_moves(analysis, sign)
 		if candidate_ai_moves[0]['move'] == 'pass':
+			return 'pass'
+		elif self.triple_pass(analysis):
 			return 'pass'
 
 		def settledness(d: dict, player_sign: int) -> float:
@@ -314,6 +312,8 @@ class GTPEngine:
 
 		if self.should_resign(root_info):
 			return 'resign'
+		elif self.triple_pass(analysis):
+			return 'pass'
 
 		candidate_ai_moves = candidate_moves(analysis, sign)
 		allowed_moves = []
@@ -321,7 +321,7 @@ class GTPEngine:
 		for d in candidate_ai_moves:
 			if d['move'] == 'pass':
 				if d['order'] == 0 or \
-						(root_info['rawVarTimeLeft'] < 0.002 and d['order'] < 5 and d['pointsLost'] < 0.2):
+						(analysis['moveInfos'][0]['scoreStdev'] < 2 and d['order'] < 5 and d['pointsLost'] < 0.2):
 					return 'pass'
 				continue
 			if d['pointsLost'] > self.MAX_POINTS_LOST:
@@ -338,6 +338,14 @@ class GTPEngine:
 		return (root_info['rawVarTimeLeft'] < 0.01 and \
 			(self.next_player == 'b' and root_info['scoreLead'] < -40.0 and root_info['winrate'] < 0.03)) or \
 			(self.next_player == 'w' and root_info['scoreLead'] > 40.0 and root_info['winrate'] > 0.97)
+
+	def triple_pass(self, analysis: dict) -> bool:
+		if self.consecutive_passes >= 3 and len(self.moves) > 2 * self.size and analysis['moveInfos'][0]['scoreStdev'] < 2:
+			print(f'DISCUSSION:since you passed 3 times after move {2 * self.size}, I will pass as well',
+				file=sys.stderr)
+			return True
+		else:
+			return False
 
 def sgfmill_to_str(move: Move) -> str:
 	if move == 'pass':
